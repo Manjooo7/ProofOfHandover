@@ -117,7 +117,25 @@ Satu file `index.html`, tanpa framework dan tanpa build step. Hanya ethers.js v6
 - Baca data via `JsonRpcProvider` sehingga verifikasi jalan tanpa wallet
 - Deteksi jaringan salah, dengan tombol pindah/tambah jaringan otomatis
 - Deep link `?id=<nomor>` untuk dibagikan ke pembeli
-- Bahasa Indonesia, mobile-first, tanpa jargon crypto di permukaan
+- **Mode terang & gelap**, mengikuti setelan sistem dan bisa diganti manual
+- **Dua bahasa (Indonesia & Inggris)**, terdeteksi dari bahasa browser
+- Mobile-first, tanpa jargon crypto di permukaan
+
+### Mode gelap
+
+Tombol ikon di header menukar tema. Nilai awalnya mengikuti `prefers-color-scheme`, dan pilihan manual disimpan di `localStorage` (`poh.theme`). Tema dipasang oleh skrip kecil di dalam `<head>` sebelum halaman dilukis, jadi tidak ada kedipan putih saat memuat. Seluruh warna memakai CSS custom property, sehingga mode gelap hanya menimpa token di `[data-theme="dark"]` — palet kertas-dan-tinta aslinya tetap dipertahankan, bukan diganti abu-abu netral.
+
+### Dua bahasa
+
+Pemilih `ID | EN` di header. Bahasa awal ditebak dari `navigator.language`, lalu pilihan manual selalu menang dan disimpan di `localStorage` (`poh.lang`).
+
+Teks statis diberi atribut `data-i18n` (varian: `-html`, `-ph` untuk placeholder, `-aria` untuk label aksesibilitas) dan diisi dari satu kamus di `index.html` dengan format `"kunci": ["Indonesia", "English"]`. Teks yang dibuat runtime memakai `t("kunci")`, sehingga yang ikut diterjemahkan bukan cuma tampilan statis:
+
+- pesan error MetaMask dan kegagalan jaringan
+- pesan `require()` dari kontrak (teksnya berbahasa Indonesia, dipetakan lewat `REVERT_MAP`)
+- label status kartu catatan dan penjelasan sesuai peran pembaca
+- pesan WhatsApp yang dikirim ke pembeli
+- format tanggal (`id-ID` atau `en-GB`) dan format angka saldo
 
 ### Menjalankan secara lokal
 

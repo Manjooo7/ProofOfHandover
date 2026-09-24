@@ -4,11 +4,30 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Bukti Serah Terima Barang — Proof of Handover</title>
-<meta name="description" content="Bikin bukti serah terima barang yang tidak bisa dihapus atau diedit siapa pun. Penjual mencatat, pembeli mengonfirmasi sendiri." />
+<meta name="description" content="Bikin bukti serah terima barang yang tidak bisa dihapus atau diedit siapa pun. Penjual mencatat, pembeli mengonfirmasi dari HP-nya sendiri." />
 <meta name="theme-color" content="#f1eadb" />
-<meta name="color-scheme" content="light" />
+<meta name="color-scheme" content="light dark" />
 <!-- favicon: kotak bergaris tinta di atas kertas, sewarna ikon -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23f1eadb'/%3E%3Cg fill='none' stroke='%2323211d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 11 16 6l11 5v10L16 26 5 21z'/%3E%3Cpath d='M5 11l11 5 11-5M16 16v10'/%3E%3C/g%3E%3C/svg%3E" />
+
+<!-- Tema & bahasa ditetapkan sebelum halaman dilukis, supaya tidak ada
+     kedipan putih saat pengguna memilih mode gelap. Sengaja inline dan
+     sesingkat mungkin: ini satu-satunya skrip yang memblokir render. -->
+<script>
+(function () {
+  try {
+    document.documentElement.classList.add("js");
+
+    var t = localStorage.getItem("poh.theme");
+    if (!t) t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t);
+
+    var l = localStorage.getItem("poh.lang");
+    if (!l) l = (navigator.language || "id").toLowerCase().indexOf("id") === 0 ? "id" : "en";
+    document.documentElement.setAttribute("lang", l);
+  } catch (e) { /* localStorage diblokir -> pakai bawaan halaman */ }
+})();
+</script>
 
 <!-- ethers.js v6 (UMD) dari CDN -> menyediakan global `ethers` -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
@@ -40,31 +59,94 @@
 
     --ring:#8a6110;
     --r:14px;
+
+    /* token tambahan untuk tampilan modern */
+    --maxw:880px;
+    --r-lg:20px;
+    --shadow-1:0 1px 2px rgba(35,33,29,.05), 0 4px 14px rgba(35,33,29,.05);
+    --shadow-2:0 2px 4px rgba(35,33,29,.06), 0 14px 34px rgba(35,33,29,.10);
+    --header-bg:rgba(250,245,234,.82);
+    --glow-a:rgba(150,105,15,.16);   /* nuansa tinta emas */
+    --glow-b:rgba(47,107,69,.13);    /* nuansa tinta hijau */
+    --grain:.06;
+    --hi:#e4d4ab;                    /* stabilo di balik kata kunci */
+    --paper-focus:#ffffff;           /* latar kolom saat difokuskan */
   }
+
+  /* Mode gelap: kertas jadi tinta, tinta jadi kertas. Palet tetap
+     keluarga warna yang sama (hangat, bukan biru-abu netral). */
+  [data-theme="dark"]{
+    --paper:#15130f;
+    --paper-card:#1d1a15;
+    --paper-input:#24201a;
+    --paper-sunk:#100e0b;
+
+    --ink:#f2ead9;
+    --ink-2:#cbc2ae;
+    --ink-3:#9c937f;
+    --line:#332e26;
+    --line-2:#463f34;
+
+    --ok:#6fbc8b;   --ok-bg:#18271d;   --ok-ink:#b6ddc3;
+    --warn:#dfae57; --warn-bg:#2a2113; --warn-ink:#ecd39d;
+    --err:#e3877a;  --err-bg:#2d1a16;  --err-ink:#f0bdb3;
+    --info:#8fb2e3; --info-bg:#161f2c; --info-ink:#c6d8ef;
+    --grey-bg:#262018;
+
+    --ring:#d8a942;
+    --shadow-1:0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.34);
+    --shadow-2:0 2px 6px rgba(0,0,0,.46), 0 16px 38px rgba(0,0,0,.42);
+    --header-bg:rgba(29,26,21,.84);
+    --glow-a:rgba(216,169,66,.13);
+    --glow-b:rgba(111,188,139,.10);
+    --grain:.05;
+    --hi:#4a3a17;
+    --paper-focus:#2c2721;
+  }
+
   *{box-sizing:border-box}
+  /* Beberapa elemen (chip saldo, chip alamat) memakai display:inline-flex,
+     yang mengalahkan atribut [hidden]. Tanpa aturan ini, chip kosong tetap
+     tampil di header sebagai kotak melayang. */
+  [hidden]{display:none!important}
   html{scroll-behavior:smooth;color-scheme:light}
+  [data-theme="dark"]{color-scheme:dark}
   body{
     margin:0;color:var(--ink);
     background-color:var(--paper);
     /* butiran kertas halus, meniru tekstur cetak stempel */
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
-    font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     -webkit-text-size-adjust:100%;
+    transition:background-color .25s ease,color .25s ease;
   }
-  ::selection{background:#e4d4ab;color:var(--ink)}
+  ::selection{background:var(--hi);color:var(--ink)}
   a{color:var(--info)}
   a:focus-visible,button:focus-visible,input:focus-visible,
   textarea:focus-visible,summary:focus-visible{
     outline:3px solid var(--ring);outline-offset:2px;border-radius:6px;
   }
-  .wrap{max-width:780px;margin:0 auto;padding:8px 16px 40px}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:8px 16px 40px}
+
+  /* muncul halus saat di-scroll; dinonaktifkan bila pengguna minta sedikit gerak.
+     Aturan hanya berlaku saat JS hidup (html.js), supaya teks tidak pernah
+     tersembunyi permanen kalau skrip gagal dimuat. */
+  html.js .reveal{opacity:0;transform:translateY(16px)}
+  html.js .reveal.in{opacity:1;transform:none;transition:opacity .55s ease,transform .55s ease}
+
 
   /* ---------------- header ---------------- */
   header.top{
-    border-bottom:2px solid var(--ink);background:var(--paper-card);
+    border-bottom:2px solid var(--ink);
+    background:var(--header-bg);
+    -webkit-backdrop-filter:saturate(180%) blur(12px);
+    backdrop-filter:saturate(180%) blur(12px);
     position:sticky;top:0;z-index:30;
   }
-  .top-in{max-width:780px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .top-in{
+    max-width:var(--maxw);margin:0 auto;padding:10px 16px;
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  }
   .brand{display:flex;align-items:center;gap:12px;margin-right:auto;min-width:0}
   /* cincin ganda, meniru bingkai lingkaran pada ikon */
   .brand-mark{
@@ -78,62 +160,157 @@
   .brand-txt span{font-size:.74rem;color:var(--ink-3);white-space:nowrap}
   .wallet-box{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 
+  /* --- tombol ikon (tema) & pemilih bahasa --- */
+  .tools{display:flex;align-items:center;gap:8px}
+  .icon-btn{
+    width:40px;height:40px;min-height:40px;padding:0;flex:none;
+    display:grid;place-items:center;border-radius:12px;
+    background:var(--paper-card);border:1.5px solid var(--line-2);color:var(--ink);
+  }
+  .icon-btn:hover{border-color:var(--ink);background:var(--paper-sunk)}
+  .icon-btn svg{width:19px;height:19px;display:block}
+  /* hanya satu ikon yang tampil, tergantung tema aktif */
+  .icon-btn .i-moon{display:none}
+  [data-theme="dark"] .icon-btn .i-sun{display:none}
+  [data-theme="dark"] .icon-btn .i-moon{display:block}
+  .seg{
+    display:flex;border:1.5px solid var(--line-2);border-radius:12px;
+    overflow:hidden;background:var(--paper-card);height:40px;
+  }
+  .seg button{
+    border:0;border-radius:0;min-height:38px;padding:0 11px;font-size:.8rem;font-weight:700;
+    letter-spacing:.4px;background:transparent;color:var(--ink-3);
+  }
+  .seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+  .seg button:not([aria-pressed="true"]):hover{background:var(--paper-sunk);color:var(--ink)}
+
   /* ---------------- buttons ---------------- */
   button{
     font:inherit;cursor:pointer;border-radius:11px;border:1.5px solid transparent;
-    padding:12px 17px;min-height:44px;transition:background .15s,color .15s,border-color .15s;
+    padding:12px 17px;min-height:44px;
+    transition:background .15s,color .15s,border-color .15s,transform .12s,box-shadow .15s;
   }
   button:disabled{opacity:.42;cursor:not-allowed}
+  button:active:not(:disabled){transform:translateY(1px)}
   /* tombol utama = blok tinta pekat di atas kertas, seperti cap */
-  .btn-primary{background:var(--ink);color:var(--paper);font-weight:650;border-color:var(--ink)}
-  .btn-primary:hover:not(:disabled){background:#3b362d}
+  .btn-primary{background:var(--ink);color:var(--paper);font-weight:650;border-color:var(--ink);box-shadow:var(--shadow-1)}
+  .btn-primary:hover:not(:disabled){background:var(--ink-2);box-shadow:var(--shadow-2)}
   .btn-ghost{background:transparent;color:var(--ink);border-color:var(--ink)}
   .btn-ghost:hover:not(:disabled){background:var(--paper-sunk)}
   .btn-ok{background:var(--ok);color:#fff;font-weight:700;border-color:var(--ok)}
-  .btn-ok:hover:not(:disabled){background:#255636}
+  .btn-ok:hover:not(:disabled){filter:brightness(.92)}
   .btn-warn{background:var(--warn);color:#fff;font-weight:700;border-color:var(--warn)}
-  .btn-warn:hover:not(:disabled){background:#7c560c}
+  .btn-warn:hover:not(:disabled){filter:brightness(.92)}
   .btn-danger{background:var(--err);color:#fff;font-weight:700;border-color:var(--err)}
+  /* di mode gelap warna semantik jadi lebih terang -> teks tombol harus gelap */
+  [data-theme="dark"] .btn-ok,[data-theme="dark"] .btn-warn,[data-theme="dark"] .btn-danger{color:#15130f}
   .btn-sm{padding:8px 13px;min-height:38px;font-size:.87rem}
   .btn-xs{padding:5px 10px;min-height:32px;font-size:.78rem;border-radius:8px}
   .btn-block{width:100%}
 
   /* ---------------- hero ---------------- */
-  .hero{padding:26px 0 6px}
-  h1{font-size:1.72rem;line-height:1.28;margin:0 0 10px;letter-spacing:-.3px}
-  .hero p{color:var(--ink-2);margin:0 0 6px;font-size:1rem}
-  .hero .punch{color:var(--ink);font-weight:650}
-  .roles{display:flex;gap:11px;margin:20px 0 6px;flex-wrap:wrap}
-  .role{
-    flex:1 1 220px;text-align:left;background:var(--paper-card);border:1.5px solid var(--line-2);
-    border-radius:var(--r);padding:15px 16px;display:flex;gap:12px;align-items:flex-start;
+  .hero{padding:40px 0 8px;position:relative}
+  /* dua noda cahaya lembut di belakang judul, memberi kedalaman tanpa gambar */
+  .hero::before{
+    content:"";position:absolute;inset:-80px -40px auto -40px;height:420px;z-index:-1;
+    background:
+      radial-gradient(42% 60% at 18% 8%,var(--glow-a),transparent 70%),
+      radial-gradient(40% 55% at 88% 22%,var(--glow-b),transparent 72%);
+    filter:blur(6px);pointer-events:none;
   }
-  .role:hover{border-color:var(--ink);background:#fffdf6}
-  .role .ico{font-size:1.35rem;line-height:1;flex:none;margin-top:1px}
-  .role b{display:block;font-size:.99rem;margin-bottom:2px;color:var(--ink)}
-  .role span{display:block;font-size:.82rem;color:var(--ink-3);font-weight:400;line-height:1.45}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;margin:0 0 16px;
+    font-size:.76rem;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+    color:var(--ink-2);background:var(--paper-card);border:1.5px solid var(--line-2);
+    border-radius:999px;padding:6px 13px;box-shadow:var(--shadow-1);
+  }
+  .eyebrow .live{
+    width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none;
+    box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 25%,transparent);
+    animation:pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse{50%{opacity:.35}}
+  h1{
+    font-size:clamp(1.85rem,5.4vw,2.7rem);line-height:1.14;margin:0 0 14px;
+    letter-spacing:-1px;font-weight:800;text-wrap:balance;
+  }
+  /* kata kunci diberi stabilo, meneruskan metafora stempel di atas kertas */
+  h1 .mark{
+    background:linear-gradient(transparent 62%,var(--hi) 62%);
+    padding:0 2px;border-radius:2px;
+  }
+  .hero .lede{color:var(--ink-2);margin:0 0 8px;font-size:clamp(1rem,2.4vw,1.12rem);max-width:60ch}
+  .hero .punch{
+    color:var(--ink);font-weight:700;margin:14px 0 0;font-size:1.02rem;
+    border-left:3px solid var(--ink);padding-left:12px;
+  }
+  .roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(248px,1fr));gap:12px;margin:26px 0 6px}
+  .role{
+    text-align:left;background:var(--paper-card);border:1.5px solid var(--line-2);
+    border-radius:var(--r-lg);padding:17px 18px;display:flex;gap:13px;align-items:flex-start;
+    box-shadow:var(--shadow-1);position:relative;overflow:hidden;
+  }
+  .role::after{
+    content:"→";position:absolute;right:16px;bottom:13px;font-size:1.05rem;color:var(--ink-3);
+    transition:transform .18s,color .18s;
+  }
+  .role:hover{border-color:var(--ink);box-shadow:var(--shadow-2);transform:translateY(-2px)}
+  .role:hover::after{transform:translateX(4px);color:var(--ink)}
+  .role .ico{
+    font-size:1.2rem;line-height:1;flex:none;width:38px;height:38px;border-radius:11px;
+    display:grid;place-items:center;background:var(--paper-sunk);border:1.5px solid var(--line-2);
+  }
+  .role b{display:block;font-size:1.02rem;margin-bottom:3px;color:var(--ink)}
+  .role span{display:block;font-size:.84rem;color:var(--ink-3);font-weight:400;line-height:1.5}
   .stat{
-    display:inline-block;margin:14px 0 0;font-size:.85rem;color:var(--ink-2);
-    background:var(--paper-card);border:1.5px solid var(--line-2);border-radius:999px;padding:6px 13px;
+    display:inline-flex;align-items:center;gap:8px;margin:18px 0 0;font-size:.86rem;color:var(--ink-2);
+    background:var(--paper-card);border:1.5px solid var(--line-2);border-radius:999px;padding:7px 14px;
+    box-shadow:var(--shadow-1);
   }
 
+  /* --- strip kepercayaan: tiga janji inti, dibaca dalam 3 detik --- */
+  .trust{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:22px 0 0;
+    padding:0;list-style:none;
+  }
+  .trust li{
+    display:flex;gap:10px;align-items:flex-start;font-size:.85rem;color:var(--ink-2);
+    background:var(--paper-card);border:1.5px solid var(--line-2);border-radius:12px;padding:12px 13px;
+  }
+  .trust b{display:block;color:var(--ink);font-size:.89rem;margin-bottom:1px}
+  .trust .tick-ico{color:var(--ok);flex:none;font-weight:800}
+
   /* ---------------- cara kerja ---------------- */
-  .how{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin:22px 0 4px}
+  .how-head{margin:26px 0 14px}
+  .how-head h2{font-size:1.12rem;margin:0}
+  .how-head p{margin:3px 0 0;font-size:.88rem;color:var(--ink-3)}
+  .how{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 4px;position:relative}
   .how div{
-    background:var(--paper-card);border:1.5px solid var(--line-2);border-radius:12px;padding:14px;
-    font-size:.85rem;color:var(--ink-2);
+    background:var(--paper-card);border:1.5px solid var(--line-2);border-radius:var(--r-lg);padding:16px;
+    font-size:.85rem;color:var(--ink-2);box-shadow:var(--shadow-1);transition:border-color .18s,box-shadow .18s;
+    position:relative;
   }
-  .how b{display:block;color:var(--ink);font-size:.9rem;margin:6px 0 3px}
+  .how div:hover{border-color:var(--ink);box-shadow:var(--shadow-2)}
+  .how b{display:block;color:var(--ink);font-size:.92rem;margin:9px 0 4px}
   .how .num{
-    width:24px;height:24px;border-radius:50%;background:var(--ink);color:var(--paper);
-    display:grid;place-items:center;font-size:.78rem;font-weight:700;
+    width:27px;height:27px;border-radius:50%;background:var(--ink);color:var(--paper);
+    display:grid;place-items:center;font-size:.8rem;font-weight:800;
   }
-  @media (max-width:600px){.how{grid-template-columns:1fr}}
+  /* garis penghubung antar langkah, hanya di layar lebar */
+  .how div:not(:last-child)::after{
+    content:"";position:absolute;top:29px;right:-12px;width:12px;height:1.5px;
+    background:var(--line-2);
+  }
+  @media (max-width:600px){
+    .how{grid-template-columns:1fr}
+    .how div:not(:last-child)::after{display:none}
+  }
+
 
   /* ---------------- sections ---------------- */
   section.card{
-    background:var(--paper-card);border:1.5px solid var(--line-2);border-radius:var(--r);
-    padding:20px;margin:18px 0;scroll-margin-top:84px;
+    background:var(--paper-card);border:1.5px solid var(--line-2);border-radius:var(--r-lg);
+    padding:24px;margin:22px 0;scroll-margin-top:92px;box-shadow:var(--shadow-1);
   }
   section.card.flash{animation:flash 1.5s ease-out}
   @keyframes flash{0%,18%{border-color:var(--ink);box-shadow:0 0 0 4px rgba(35,33,29,.1)}100%{}}
@@ -159,8 +336,8 @@
   /* Jangan pernah turunkan font input di bawah 16px: iOS Safari otomatis
      zoom-in saat kolom difokuskan, dan tampilan jadi melompat. */
   input.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:1rem}
-  input:focus,textarea:focus{border-color:var(--ink);background:#fff}
-  input::placeholder,textarea::placeholder{color:#9c9484}
+  input:focus,textarea:focus{border-color:var(--ink);background:var(--paper-focus)}
+  input::placeholder,textarea::placeholder{color:var(--ink-3);opacity:.85}
   textarea{resize:vertical;min-height:78px;line-height:1.55}
   input[aria-invalid="true"],textarea[aria-invalid="true"]{border-color:var(--err)}
   input.valid{border-color:var(--ok)}
@@ -314,8 +491,8 @@
   .faq .ans strong{color:var(--ink)}
 
   /* ---------------- footer ---------------- */
-  footer{border-top:2px solid var(--ink);background:var(--paper-sunk);margin-top:34px}
-  .foot-in{max-width:780px;margin:0 auto;padding:22px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  footer{border-top:2px solid var(--ink);background:var(--paper-sunk);margin-top:40px}
+  .foot-in{max-width:var(--maxw);margin:0 auto;padding:22px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
   .bot-logo{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.3px;font-size:.95rem}
   .bot-mark{
     width:32px;height:32px;border-radius:50%;flex:none;
@@ -323,23 +500,29 @@
     display:grid;place-items:center;color:var(--ink);font-size:.6rem;font-weight:800;letter-spacing:.3px;
   }
   .foot-links{display:flex;gap:16px;flex-wrap:wrap;margin-left:auto;font-size:.88rem}
-  .foot-note{max-width:780px;margin:0 auto;padding:0 16px 22px;font-size:.77rem;color:var(--ink-3);line-height:1.7}
+  .foot-note{max-width:var(--maxw);margin:0 auto;padding:0 16px 22px;font-size:.77rem;color:var(--ink-3);line-height:1.7}
   /* Alamat kontrak 42 karakter: harus boleh dipotong, kalau tidak layar sempit ikut melebar. */
   .foot-note .mono{overflow-wrap:anywhere;word-break:break-all}
   .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
   @media (max-width:560px){
-    h1{font-size:1.45rem}
     .wrap{padding-left:13px;padding-right:13px}
-    section.card{padding:17px}
+    section.card{padding:18px}
     .foot-links{margin-left:0}
     dl.kv dt{flex:0 0 100%;min-width:0}
     .brand-txt span{display:none}
-    .top-in{padding:10px 13px}
+    .top-in{padding:9px 13px;gap:8px}
+    .hero{padding-top:28px}
+    .hero .punch{font-size:.96rem}
+    /* di layar sempit: baris 1 = brand + alat, baris 2 = wallet melebar penuh */
+    .wallet-box{width:100%;order:3}
+    .wallet-box #btnConnect{flex:1}
   }
   @media (prefers-reduced-motion:reduce){
     *{animation:none!important;transition:none!important}
     html{scroll-behavior:auto}
+    .reveal{opacity:1;transform:none}
+    html.js .reveal{opacity:1;transform:none}
   }
 </style>
 </head>
@@ -357,10 +540,33 @@
         </svg>
       </span>
       <span class="brand-txt">
-        <b>Bukti Serah Terima</b>
-        <span>Tersimpan permanen, tidak bisa dihapus</span>
+        <b data-i18n="brand.title">Bukti Serah Terima</b>
+        <span data-i18n="brand.sub">Tersimpan permanen, tidak bisa dihapus</span>
       </span>
     </div>
+
+    <div class="tools">
+      <!-- ganti tema: satu tombol, ikon menyesuaikan tema aktif -->
+      <button id="btnTheme" class="icon-btn" type="button" aria-pressed="false"
+              title="Ganti ke mode gelap" aria-label="Ganti ke mode gelap">
+        <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+             stroke-linecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.2"/>
+          <path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.4 5.4l1.5 1.5M17.1 17.1l1.5 1.5M18.6 5.4l-1.5 1.5M6.9 17.1l-1.5 1.5"/>
+        </svg>
+        <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20.5 14.6A8.6 8.6 0 1 1 9.4 3.5a7 7 0 0 0 11.1 11.1z"/>
+        </svg>
+      </button>
+
+      <!-- pilih bahasa: terdeteksi otomatis dari browser, bisa diganti manual -->
+      <div class="seg" role="group" data-i18n-aria="btn.lang" aria-label="Pilih bahasa">
+        <button id="btnLangId" type="button" aria-pressed="true" lang="id">ID</button>
+        <button id="btnLangEn" type="button" aria-pressed="false" lang="en">EN</button>
+      </div>
+    </div>
+
     <div class="wallet-box">
       <span id="balChip" class="chip" hidden></span>
       <span id="netPill" class="pill pill-grey"><span class="dot"></span><span id="netLabel">—</span></span>
@@ -373,101 +579,131 @@
 <main class="wrap">
 
   <!-- ============ HERO ============ -->
-  <div class="hero">
-    <h1>Bukti serah terima yang tidak bisa dihapus atau diedit siapa pun</h1>
-    <p>
-      Penjual mencatat barang, kondisi, dan harganya. Pembeli menekan tombol “sudah saya terima”
-      dari perangkat nya sendiri. Keduanya jadi bukti yang tersimpan permanen.
+  <div class="hero reveal">
+    <p class="eyebrow">
+      <span class="live" aria-hidden="true"></span>
+      <span data-i18n="hero.badge">Aktif di BOT Chain Mainnet</span>
     </p>
-    <p class="punch">WhatsApp bisa dihapus, blockchain tidak.</p>
+
+    <h1 data-i18n-html="hero.h1">
+      Bukti serah terima yang <span class="mark">tidak bisa dihapus</span> atau diedit siapa pun
+    </h1>
+
+    <p class="lede" data-i18n="hero.lede">
+      Penjual mencatat barang, kondisi, dan harganya. Pembeli menekan tombol “sudah saya terima”
+      dari HP-nya sendiri. Keduanya jadi bukti yang tersimpan permanen.
+    </p>
+    <p class="punch" data-i18n="hero.punch">WhatsApp bisa dihapus, blockchain tidak.</p>
 
     <div class="roles">
       <button id="heroSeller" class="role" type="button">
         <span class="ico" aria-hidden="true">📦</span>
         <span>
-          <b>Saya penjual</b>
-          <span>Saya mau bikin catatan serah terima untuk barang yang saya jual</span>
+          <b data-i18n="hero.sellerTitle">Saya penjual</b>
+          <span data-i18n="hero.sellerSub">Saya mau bikin catatan serah terima untuk barang yang saya jual</span>
         </span>
       </button>
       <button id="heroBuyer" class="role" type="button">
         <span class="ico" aria-hidden="true">✅</span>
         <span>
-          <b>Saya pembeli</b>
-          <span>Saya dapat ID atau link dari penjual dan mau cek atau konfirmasi</span>
+          <b data-i18n="hero.buyerTitle">Saya pembeli</b>
+          <span data-i18n="hero.buyerSub">Saya dapat ID atau link dari penjual dan mau cek atau konfirmasi</span>
         </span>
       </button>
     </div>
 
-    <div class="how">
-      <div>
-        <span class="num" aria-hidden="true">1</span>
-        <b>Penjual mengisi form</b>
-        Nama barang, kondisi, harga, dan alamat wallet pembeli.
-      </div>
-      <div>
-        <span class="num" aria-hidden="true">2</span>
-        <b>Penjual kirim link</b>
-        Catatan dapat nomor ID. Kirim link-nya lewat WhatsApp ke pembeli.
-      </div>
-      <div>
-        <span class="num" aria-hidden="true">3</span>
-        <b>Pembeli konfirmasi</b>
-        Sekali ditekan, catatan terkunci selamanya. Selesai.
-      </div>
-    </div>
+    <ul class="trust">
+      <li>
+        <span class="tick-ico" aria-hidden="true">✓</span>
+        <span data-i18n-html="trust.1"><b>Tidak memegang uang</b>Kontraknya tidak punya fungsi pembayaran sama sekali.</span>
+      </li>
+      <li>
+        <span class="tick-ico" aria-hidden="true">✓</span>
+        <span data-i18n-html="trust.2"><b>Verifikasi gratis</b>Siapa pun bisa memeriksa catatan tanpa wallet.</span>
+      </li>
+      <li>
+        <span class="tick-ico" aria-hidden="true">✓</span>
+        <span data-i18n-html="trust.3"><b>Dua tanda tangan</b>Penjual mencatat, pembeli yang menyetujui.</span>
+      </li>
+    </ul>
 
     <p><span class="stat" id="statTotal">Memuat jumlah catatan…</span></p>
   </div>
 
+  <!-- ============ CARA KERJA ============ -->
+  <div class="how-head reveal">
+    <h2 data-i18n="how.title">Tiga langkah, selesai</h2>
+    <p data-i18n="how.sub">Tanpa perantara, tanpa akun, tanpa unggah dokumen.</p>
+  </div>
+  <div class="how reveal">
+    <div>
+      <span class="num" aria-hidden="true">1</span>
+      <b data-i18n="how.1t">Penjual mengisi form</b>
+      <span data-i18n="how.1d">Nama barang, kondisi, harga, dan alamat wallet pembeli.</span>
+    </div>
+    <div>
+      <span class="num" aria-hidden="true">2</span>
+      <b data-i18n="how.2t">Penjual kirim link</b>
+      <span data-i18n="how.2d">Catatan dapat nomor ID. Kirim link-nya lewat WhatsApp ke pembeli.</span>
+    </div>
+    <div>
+      <span class="num" aria-hidden="true">3</span>
+      <b data-i18n="how.3t">Pembeli konfirmasi</b>
+      <span data-i18n="how.3d">Sekali ditekan, catatan terkunci selamanya. Selesai.</span>
+    </div>
+  </div>
+
+
   <!-- ============ ALERT GLOBAL ============ -->
   <div id="alertNoWallet" class="alert alert-err" role="alert">
-    <strong>Instal MetaMask untuk menggunakan aplikasi ini</strong><br>
+    <span data-i18n-html="alert.noWallet"><strong>Instal MetaMask untuk menggunakan aplikasi ini</strong><br>
     MetaMask adalah dompet digital gratis berbentuk ekstensi browser. Tanpa itu, halaman ini
-    tidak bisa menandatangani catatan atas nama kamu.
+    tidak bisa menandatangani catatan atas nama kamu.</span>
     <div class="act">
-      <a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer">Unduh di metamask.io ↗</a>
+      <a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer"
+         data-i18n="alert.download">Unduh di metamask.io ↗</a>
     </div>
-    <div class="hint" style="margin-top:9px">
+    <div class="hint" style="margin-top:9px" data-i18n-html="alert.canStillView">
       Kamu masih bisa <em>melihat</em> catatan yang sudah ada di bagian “Cek catatan” di bawah, tanpa wallet.
     </div>
   </div>
 
   <div id="alertLib" class="alert alert-err" role="alert">
-    <strong>Gagal memuat komponen aplikasi</strong><br>
+    <span data-i18n-html="alert.lib"><strong>Gagal memuat komponen aplikasi</strong><br>
     File pendukung (ethers.js) tidak berhasil diunduh — biasanya karena koneksi internet
-    terputus atau CDN-nya diblokir jaringan kamu. Periksa koneksi, lalu muat ulang halaman ini.
+    terputus atau CDN-nya diblokir jaringan kamu. Periksa koneksi, lalu muat ulang halaman ini.</span>
     <div class="act">
-      <button id="btnReload" class="btn-warn btn-sm" type="button">Muat ulang halaman</button>
+      <button id="btnReload" class="btn-warn btn-sm" type="button" data-i18n="alert.reload">Muat ulang halaman</button>
     </div>
   </div>
 
   <div id="alertNetwork" class="alert alert-warn" role="alert">
     <span id="alertNetworkText"></span>
     <div class="act">
-      <button id="btnSwitch" class="btn-warn btn-sm">Pindahkan ke jaringan yang benar</button>
+      <button id="btnSwitch" class="btn-warn btn-sm" data-i18n="btn.switch">Pindahkan ke jaringan yang benar</button>
     </div>
   </div>
 
   <!-- ============ BAGIAN 1 — PENJUAL ============ -->
-  <section class="card" id="secCreate" aria-labelledby="h-create">
-    <span class="tag tag-sell">Untuk penjual</span>
-    <h2 id="h-create">Buat catatan serah terima</h2>
-    <p class="sub">
+  <section class="card reveal" id="secCreate" aria-labelledby="h-create">
+    <span class="tag tag-sell" data-i18n="tag.seller">Untuk penjual</span>
+    <h2 id="h-create" data-i18n="create.title">Buat catatan serah terima</h2>
+    <p class="sub" data-i18n-html="create.sub">
       Isi saat barang diserahkan ke pembeli. Setelah tersimpan, isinya
       <strong>tidak bisa kamu ubah atau hapus</strong> — termasuk oleh kami.
     </p>
 
     <form id="formCreate" novalidate>
       <div class="field">
-        <label for="inBuyer">Alamat wallet pembeli</label>
-        <p class="why">Cuma alamat inilah yang nanti boleh menekan tombol konfirmasi. Salah alamat, pembeli tidak bisa konfirmasi dan catatan tidak bisa diperbaiki.</p>
+        <label for="inBuyer" data-i18n="f.buyer">Alamat wallet pembeli</label>
+        <p class="why" data-i18n="f.buyerWhy">Cuma alamat inilah yang nanti boleh menekan tombol konfirmasi. Salah alamat, pembeli tidak bisa konfirmasi dan catatan tidak bisa diperbaiki.</p>
         <input id="inBuyer" class="mono" type="text" placeholder="0x1a2b3c…" autocomplete="off"
                spellcheck="false" aria-describedby="whyBuyer errBuyer" />
-        <div class="tick" id="tickBuyer"><span aria-hidden="true">✓</span> Format alamat sudah benar</div>
+        <div class="tick" id="tickBuyer"><span aria-hidden="true">✓</span> <span data-i18n="f.buyerOk">Format alamat sudah benar</span></div>
         <div class="err-inline" id="errBuyer" role="alert"></div>
         <details class="help">
-          <summary>Bagaimana cara dapat alamat wallet pembeli?</summary>
-          <div class="body">
+          <summary data-i18n="f.buyerHelpQ">Bagaimana cara dapat alamat wallet pembeli?</summary>
+          <div class="body" data-i18n-html="f.buyerHelpA">
             Minta pembeli melakukan ini di HP atau laptopnya:
             <ol>
               <li>Buka MetaMask.</li>
@@ -481,78 +717,79 @@
       </div>
 
       <div class="field">
-        <label for="inItem">Nama barang</label>
-        <p class="why">Tulis sejelas mungkin, termasuk varian dan kapasitasnya.</p>
+        <label for="inItem" data-i18n="f.item">Nama barang</label>
+        <p class="why" data-i18n="f.itemWhy">Tulis sejelas mungkin, termasuk varian dan kapasitasnya.</p>
         <input id="inItem" type="text" placeholder="iPhone 13 128GB warna biru" maxlength="100"
-               aria-describedby="hintItem errItem" />
-        <div class="hint" id="hintItem">Maksimal 100 karakter.</div>
+               data-i18n-ph="f.itemPh" aria-describedby="hintItem errItem" />
+        <div class="hint" id="hintItem" data-i18n="f.max100">Maksimal 100 karakter.</div>
         <div class="err-inline" id="errItem" role="alert"></div>
       </div>
 
       <div class="field">
-        <label for="inCondition">Kondisi barang saat diserahkan</label>
-        <p class="why">Bagian ini yang paling menyelamatkan kamu kalau nanti ada sengketa. Sebutkan lecet, kelengkapan, dan hal yang kurang sekalipun.</p>
+        <label for="inCondition" data-i18n="f.cond">Kondisi barang saat diserahkan</label>
+        <p class="why" data-i18n="f.condWhy">Bagian ini yang paling menyelamatkan kamu kalau nanti ada sengketa. Sebutkan lecet, kelengkapan, dan hal yang kurang sekalipun.</p>
         <textarea id="inCondition" placeholder="Mulus, ada lecet halus di sudut kanan bawah, baterai 89%, fullset dus + charger original"
-                  maxlength="300" aria-describedby="hintCond errCond"></textarea>
-        <div class="hint" id="hintCond">Maksimal 300 karakter.</div>
+                  data-i18n-ph="f.condPh" maxlength="300" aria-describedby="hintCond errCond"></textarea>
+        <div class="hint" id="hintCond" data-i18n="f.max300">Maksimal 300 karakter.</div>
         <div class="err-inline" id="errCond" role="alert"></div>
       </div>
 
       <div class="field">
-        <label for="inPrice">Harga kesepakatan</label>
-        <p class="why">Tulis apa adanya. Aplikasi ini hanya mencatat, tidak menerima atau menahan uang sama sekali.</p>
+        <label for="inPrice" data-i18n="f.price">Harga kesepakatan</label>
+        <p class="why" data-i18n="f.priceWhy">Tulis apa adanya. Aplikasi ini hanya mencatat, tidak menerima atau menahan uang sama sekali.</p>
         <input id="inPrice" type="text" placeholder="Rp 5.500.000" maxlength="50"
-               aria-describedby="hintPrice errPrice" />
-        <div class="hint" id="hintPrice">Maksimal 50 karakter.</div>
+               data-i18n-ph="f.pricePh" aria-describedby="hintPrice errPrice" />
+        <div class="hint" id="hintPrice" data-i18n="f.max50">Maksimal 50 karakter.</div>
         <div class="err-inline" id="errPrice" role="alert"></div>
       </div>
 
-      <p class="costnote">
+      <p class="costnote" data-i18n="create.costnote">
         Menyimpan ke blockchain butuh biaya jaringan kecil yang dibayar dari saldo BOT kamu,
         bukan ke kami. MetaMask akan menampilkan jumlahnya dan kamu bisa menolak sebelum apa pun terkirim.
       </p>
 
-      <button id="btnCreate" type="submit" class="btn-primary btn-block">Simpan catatan ke blockchain</button>
+      <button id="btnCreate" type="submit" class="btn-primary btn-block" data-i18n="btn.create">Simpan catatan ke blockchain</button>
     </form>
 
     <div id="createStatus" class="alert" role="status" aria-live="polite" style="margin:17px 0 0"></div>
 
     <!-- kotak share setelah sukses -->
     <div id="shareBox">
-      <h4>Catatan tersimpan permanen 🎉</h4>
-      <p class="sub">Langkah terakhir: kirim link ini ke pembeli supaya dia bisa mengonfirmasi.</p>
+      <h4 data-i18n="share.title">Catatan tersimpan permanen 🎉</h4>
+      <p class="sub" data-i18n="share.sub">Langkah terakhir: kirim link ini ke pembeli supaya dia bisa mengonfirmasi.</p>
       <span class="idbig" id="shareId">#—</span>
       <div class="linkrow">
-        <input id="shareLink" type="text" readonly aria-label="Link untuk dibagikan ke pembeli" />
-        <button id="btnCopyLink" class="btn-ghost" type="button">Salin</button>
+        <input id="shareLink" type="text" readonly data-i18n-aria="share.linkLabel"
+               aria-label="Link untuk dibagikan ke pembeli" />
+        <button id="btnCopyLink" class="btn-ghost" type="button" data-i18n="btn.copy">Salin</button>
       </div>
       <div class="sharebtns">
         <a id="btnWa" class="btn-wa" href="#" target="_blank" rel="noopener noreferrer">
-          <span aria-hidden="true">💬</span> Kirim via WhatsApp
+          <span aria-hidden="true">💬</span> <span data-i18n="btn.wa">Kirim via WhatsApp</span>
         </a>
-        <button id="btnViewMine" class="btn-ghost" type="button">Lihat catatannya</button>
+        <button id="btnViewMine" class="btn-ghost" type="button" data-i18n="btn.viewMine">Lihat catatannya</button>
       </div>
     </div>
   </section>
 
   <!-- ============ BAGIAN 2 — PEMBELI / SIAPA SAJA ============ -->
-  <section class="card" id="secCheck" aria-labelledby="h-check">
-    <span class="tag tag-buy">Untuk pembeli &amp; siapa saja</span>
-    <h2 id="h-check">Cek catatan &amp; konfirmasi</h2>
-    <p class="sub">
+  <section class="card reveal" id="secCheck" aria-labelledby="h-check">
+    <span class="tag tag-buy" data-i18n="tag.buyer">Untuk pembeli &amp; siapa saja</span>
+    <h2 id="h-check" data-i18n="check.title">Cek catatan &amp; konfirmasi</h2>
+    <p class="sub" data-i18n-html="check.sub">
       Masukkan nomor ID yang dikirim penjual. <strong>Tidak perlu wallet</strong> kalau kamu
       hanya ingin melihat — wallet baru dibutuhkan saat pembeli menekan tombol konfirmasi.
     </p>
 
     <form id="formCheck" novalidate>
       <div class="field" style="margin-bottom:0">
-        <label for="inId">Nomor ID catatan</label>
+        <label for="inId" data-i18n="f.id">Nomor ID catatan</label>
         <div class="with-side">
           <input id="inId" type="number" min="1" step="1" inputmode="numeric" placeholder="contoh: 1"
-                 aria-describedby="hintId errId" />
-          <button id="btnCheck" type="submit" class="btn-primary">Cek</button>
+                 data-i18n-ph="f.idPh" aria-describedby="hintId errId" />
+          <button id="btnCheck" type="submit" class="btn-primary" data-i18n="btn.check">Cek</button>
         </div>
-        <div class="hint" id="hintId">Nomor urut dari penjual, dimulai dari 1.</div>
+        <div class="hint" id="hintId" data-i18n="f.idHint">Nomor urut dari penjual, dimulai dari 1.</div>
         <div class="err-inline" id="errId" role="alert"></div>
       </div>
     </form>
@@ -561,8 +798,8 @@
 
     <div id="emptyState" class="empty" style="margin-top:17px">
       <span class="big" aria-hidden="true">🔎</span>
-      Belum ada catatan yang ditampilkan.<br>
-      Masukkan nomor ID di atas, atau buka link yang dikirim penjual.
+      <span data-i18n-html="check.empty">Belum ada catatan yang ditampilkan.<br>
+      Masukkan nomor ID di atas, atau buka link yang dikirim penjual.</span>
     </div>
 
     <!-- kartu hasil -->
@@ -570,7 +807,7 @@
       <div class="res-head">
         <div>
           <h3 id="rItem">—</h3>
-          <div class="idtag">Catatan nomor <span id="rId" class="mono"></span></div>
+          <div class="idtag"><span data-i18n="res.idtag">Catatan nomor</span> <span id="rId" class="mono"></span></div>
         </div>
         <span id="rStatusPill" class="pill pill-grey"><span class="dot"></span><span id="rStatusText">—</span></span>
       </div>
@@ -578,39 +815,39 @@
       <p id="statusNote"></p>
 
       <dl class="kv">
-        <div><dt>Kondisi</dt><dd id="rCondition">—</dd></div>
-        <div><dt>Harga</dt><dd id="rPrice">—</dd></div>
-        <div><dt>Penjual</dt><dd id="rSeller">—</dd></div>
-        <div><dt>Pembeli</dt><dd id="rBuyer">—</dd></div>
-        <div><dt>Dicatat</dt><dd id="rCreatedAt">—</dd></div>
-        <div><dt>Dikonfirmasi</dt><dd id="rConfirmedAt">—</dd></div>
+        <div><dt data-i18n="res.cond">Kondisi</dt><dd id="rCondition">—</dd></div>
+        <div><dt data-i18n="res.price">Harga</dt><dd id="rPrice">—</dd></div>
+        <div><dt data-i18n="res.seller">Penjual</dt><dd id="rSeller">—</dd></div>
+        <div><dt data-i18n="res.buyer">Pembeli</dt><dd id="rBuyer">—</dd></div>
+        <div><dt data-i18n="res.createdAt">Dicatat</dt><dd id="rCreatedAt">—</dd></div>
+        <div><dt data-i18n="res.confirmedAt">Dikonfirmasi</dt><dd id="rConfirmedAt">—</dd></div>
       </dl>
 
       <!-- FE7: hanya dirender kalau wallet aktif == pembeli & belum dikonfirmasi -->
       <div id="confirmZone" class="confirm-zone">
-        <p class="cz-head">Kamu adalah pembeli pada catatan ini</p>
-        <p class="cz-sub">
+        <p class="cz-head" data-i18n="cz.head">Kamu adalah pembeli pada catatan ini</p>
+        <p class="cz-sub" data-i18n="cz.sub">
           Pastikan barangnya sudah benar-benar kamu pegang dan isi catatan di atas sudah sesuai.
           Kalau ada yang tidak cocok, jangan konfirmasi — hubungi penjual dulu.
         </p>
 
-        <button id="btnConfirm" class="btn-ok btn-block">Barang sudah saya terima</button>
+        <button id="btnConfirm" class="btn-ok btn-block" data-i18n="btn.received">Barang sudah saya terima</button>
 
         <!-- konfirmasi dua langkah: aksi ini permanen -->
         <div id="confirmGate">
-          <h4>⚠️ Sekali dikonfirmasi, tidak bisa dibatalkan</h4>
-          <ul>
+          <h4 data-i18n="gate.title">⚠️ Sekali dikonfirmasi, tidak bisa dibatalkan</h4>
+          <ul data-i18n-html="gate.list">
             <li>Catatan terkunci selamanya, tidak bisa diedit atau dihapus.</li>
             <li>Hanya bisa dilakukan satu kali.</li>
             <li>Butuh biaya jaringan kecil dari saldo BOT kamu.</li>
           </ul>
           <label class="check" for="chkReceived">
             <input type="checkbox" id="chkReceived" />
-            <span>Saya sudah menerima barangnya dan isi catatan di atas sudah sesuai</span>
+            <span data-i18n="gate.check">Saya sudah menerima barangnya dan isi catatan di atas sudah sesuai</span>
           </label>
           <div class="gate-btns">
-            <button id="btnConfirmFinal" class="btn-ok" disabled>Ya, konfirmasi sekarang</button>
-            <button id="btnConfirmCancel" class="btn-ghost" type="button">Batal</button>
+            <button id="btnConfirmFinal" class="btn-ok" disabled data-i18n="btn.confirmNow">Ya, konfirmasi sekarang</button>
+            <button id="btnConfirmCancel" class="btn-ghost" type="button" data-i18n="btn.cancel">Batal</button>
           </div>
         </div>
 
@@ -620,12 +857,12 @@
   </section>
 
   <!-- ============ FAQ ============ -->
-  <div class="faq">
-    <h2>Pertanyaan yang sering ditanyakan</h2>
+  <div class="faq reveal">
+    <h2 data-i18n="faq.title">Pertanyaan yang sering ditanyakan</h2>
 
     <details>
-      <summary>Apa itu wallet, dan kenapa saya perlu?</summary>
-      <div class="ans">
+      <summary data-i18n="faq.q1">Apa itu wallet, dan kenapa saya perlu?</summary>
+      <div class="ans" data-i18n-html="faq.a1">
         Wallet adalah aplikasi kecil yang menyimpan identitas digital kamu — di sini kami pakai
         <strong>MetaMask</strong>. Fungsinya seperti tanda tangan: dia membuktikan bahwa catatan ini
         benar dibuat atau disetujui oleh kamu, bukan orang lain yang mengaku-aku.
@@ -634,8 +871,8 @@
     </details>
 
     <details>
-      <summary>Apakah uang pembayaran lewat aplikasi ini?</summary>
-      <div class="ans">
+      <summary data-i18n="faq.q2">Apakah uang pembayaran lewat aplikasi ini?</summary>
+      <div class="ans" data-i18n-html="faq.a2">
         <strong>Tidak.</strong> Aplikasi ini murni mencatat kesepakatan. Pembayaran tetap kamu
         lakukan seperti biasa — transfer, tunai, atau COD. Karena tidak pernah memegang uang,
         tidak ada dana yang bisa hilang di sini.
@@ -643,8 +880,8 @@
     </details>
 
     <details>
-      <summary>Kenapa harus bayar biaya jaringan?</summary>
-      <div class="ans">
+      <summary data-i18n="faq.q3">Kenapa harus bayar biaya jaringan?</summary>
+      <div class="ans" data-i18n-html="faq.a3">
         Menulis data ke blockchain dikerjakan oleh ribuan komputer yang saling mengawasi, dan itu
         perlu biaya kecil. Biaya ini masuk ke jaringan, <strong>bukan ke kami</strong>.
         Sebagai gantinya, catatan kamu tidak bisa dihapus siapa pun — termasuk oleh pembuat
@@ -653,8 +890,8 @@
     </details>
 
     <details>
-      <summary>Saya salah isi. Bisa diedit atau dihapus?</summary>
-      <div class="ans">
+      <summary data-i18n="faq.q4">Saya salah isi. Bisa diedit atau dihapus?</summary>
+      <div class="ans" data-i18n-html="faq.a4">
         Tidak bisa, dan itu memang intinya — kalau bisa diedit, buktinya jadi tidak ada gunanya.
         Kalau ada kesalahan, buat catatan baru yang benar. Catatan lama akan tetap ada tapi tidak
         pernah dikonfirmasi pembeli, jadi jelas terlihat bahwa itu bukan yang berlaku.
@@ -663,8 +900,8 @@
     </details>
 
     <details>
-      <summary>Kalau pembeli tidak mau konfirmasi?</summary>
-      <div class="ans">
+      <summary data-i18n="faq.q5">Kalau pembeli tidak mau konfirmasi?</summary>
+      <div class="ans" data-i18n-html="faq.a5">
         Status catatan akan tetap “menunggu konfirmasi pembeli” selamanya. Itu sendiri sudah jadi
         informasi: pihak ketiga bisa melihat bahwa penjual mencatat serah terima pada tanggal
         tertentu dan pembeli belum menyetujuinya.
@@ -672,8 +909,8 @@
     </details>
 
     <details>
-      <summary>Bisa dipakai orang lain untuk memverifikasi?</summary>
-      <div class="ans">
+      <summary data-i18n="faq.q6">Bisa dipakai orang lain untuk memverifikasi?</summary>
+      <div class="ans" data-i18n-html="faq.a6">
         Bisa, dan tanpa perlu percaya pada kami. Siapa pun cukup membuka link catatan atau memasukkan
         nomor ID-nya — datanya dibaca langsung dari blockchain, bukan dari server kami.
         Kalau situs ini hilang besok, catatannya tetap ada.
@@ -688,17 +925,17 @@
   <div class="foot-in">
     <div class="bot-logo">
       <span class="bot-mark" aria-hidden="true">BOT</span>
-      <span>Dibangun di <strong>BOT Chain</strong></span>
+      <span data-i18n-html="foot.builtOn">Dibangun di <strong>BOT Chain</strong></span>
     </div>
-    <nav class="foot-links" aria-label="Tautan BOT Chain">
+    <nav class="foot-links" data-i18n-aria="foot.navLabel" aria-label="Tautan BOT Chain">
       <a href="https://botchain.ai" target="_blank" rel="noopener noreferrer">botchain.ai</a>
       <a href="https://scan.botchain.ai" target="_blank" rel="noopener noreferrer">scan.botchain.ai</a>
-      <a id="linkContract" href="#" target="_blank" rel="noopener noreferrer">Kontrak</a>
+      <a id="linkContract" href="#" target="_blank" rel="noopener noreferrer" data-i18n="foot.contractLink">Kontrak</a>
     </nav>
   </div>
   <div class="foot-note">
-    Jaringan aktif: <span id="footNet">—</span><br>
-    Kontrak: <span id="footContract" class="mono">—</span>
+    <span data-i18n="foot.activeNet">Jaringan aktif:</span> <span id="footNet">—</span><br>
+    <span data-i18n="foot.contract">Kontrak:</span> <span id="footContract" class="mono">—</span>
   </div>
 </footer>
 
@@ -839,6 +1076,542 @@ const ABI = [
 const MAX_ITEM_NAME = 100, MAX_CONDITION = 300, MAX_PRICE = 50;
 
 /* ============================================================
+   TEMA (TERANG / GELAP)
+   Tema sudah dipasang oleh skrip kecil di <head> supaya tidak
+   berkedip. Di sini hanya tombol, penyimpanan, dan sinkronisasi.
+   ============================================================ */
+
+const THEME_KEY = "poh.theme";
+const LANG_KEY  = "poh.lang";
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* mode privat: abaikan */ } }
+};
+
+const currentTheme = () =>
+  document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+
+function setTheme(theme, remember) {
+  document.documentElement.setAttribute("data-theme", theme);
+  if (remember) store.set(THEME_KEY, theme);
+  // Warna bilah alamat browser mobile ikut berubah, kalau tidak terlihat belang.
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", theme === "dark" ? "#15130f" : "#f1eadb");
+  syncThemeButton();
+}
+
+function syncThemeButton() {
+  const btn = document.getElementById("btnTheme");
+  if (!btn) return;
+  const dark = currentTheme() === "dark";
+  const label = dark ? t("btn.themeLight") : t("btn.themeDark");
+  btn.setAttribute("aria-pressed", String(dark));
+  btn.setAttribute("aria-label", label);
+  btn.title = label;
+}
+
+/* ============================================================
+   BAHASA (ID / EN)
+   Bahasa awal ditebak dari navigator.language, lalu pilihan
+   manual pengguna disimpan dan selalu menang.
+   Format kamus: "kunci": ["Indonesia", "English"]
+   ============================================================ */
+
+let LANG = document.documentElement.getAttribute("lang") === "en" ? "en" : "id";
+
+const STR = {
+  /* --- meta --- */
+  "meta.title": [
+    "Bukti Serah Terima Barang — Proof of Handover",
+    "Proof of Handover — On-chain handover receipts"
+  ],
+  "meta.desc": [
+    "Bikin bukti serah terima barang yang tidak bisa dihapus atau diedit siapa pun. Penjual mencatat, pembeli mengonfirmasi dari HP-nya sendiri.",
+    "Create a handover receipt nobody can delete or edit. The seller records it, the buyer confirms from their own phone."
+  ],
+
+  /* --- header --- */
+  "brand.title": ["Bukti Serah Terima", "Proof of Handover"],
+  "brand.sub": ["Tersimpan permanen, tidak bisa dihapus", "Stored permanently, impossible to delete"],
+  "btn.themeDark": ["Ganti ke mode gelap", "Switch to dark mode"],
+  "btn.themeLight": ["Ganti ke mode terang", "Switch to light mode"],
+  "btn.lang": ["Pilih bahasa", "Choose language"],
+
+  /* --- hero --- */
+  "hero.badge": ["Aktif di BOT Chain Mainnet", "Live on BOT Chain Mainnet"],
+  "hero.h1": [
+    "Bukti serah terima yang <span class=\"mark\">tidak bisa dihapus</span> atau diedit siapa pun",
+    "A handover receipt <span class=\"mark\">nobody can delete</span> or edit"
+  ],
+  "hero.lede": [
+    "Penjual mencatat barang, kondisi, dan harganya. Pembeli menekan tombol “sudah saya terima” dari HP-nya sendiri. Keduanya jadi bukti yang tersimpan permanen.",
+    "The seller records the item, its condition, and the price. The buyer taps “I received it” from their own phone. Together they become proof that is stored permanently."
+  ],
+  "hero.punch": ["WhatsApp bisa dihapus, blockchain tidak.", "WhatsApp can be deleted. A blockchain cannot."],
+  "hero.sellerTitle": ["Saya penjual", "I'm the seller"],
+  "hero.sellerSub": [
+    "Saya mau bikin catatan serah terima untuk barang yang saya jual",
+    "I want to create a handover record for the item I'm selling"
+  ],
+  "hero.buyerTitle": ["Saya pembeli", "I'm the buyer"],
+  "hero.buyerSub": [
+    "Saya dapat ID atau link dari penjual dan mau cek atau konfirmasi",
+    "I got an ID or a link from the seller and want to check or confirm it"
+  ],
+  "trust.1": [
+    "<b>Tidak memegang uang</b>Kontraknya tidak punya fungsi pembayaran sama sekali.",
+    "<b>Never touches money</b>The contract has no payment function at all."
+  ],
+  "trust.2": [
+    "<b>Verifikasi gratis</b>Siapa pun bisa memeriksa catatan tanpa wallet.",
+    "<b>Free to verify</b>Anyone can inspect a record without a wallet."
+  ],
+  "trust.3": [
+    "<b>Dua tanda tangan</b>Penjual mencatat, pembeli yang menyetujui.",
+    "<b>Two signatures</b>The seller records, the buyer approves."
+  ],
+
+  /* --- cara kerja --- */
+  "how.title": ["Tiga langkah, selesai", "Three steps, done"],
+  "how.sub": [
+    "Tanpa perantara, tanpa akun, tanpa unggah dokumen.",
+    "No middleman, no account, no paperwork to upload."
+  ],
+  "how.1t": ["Penjual mengisi form", "Seller fills the form"],
+  "how.1d": [
+    "Nama barang, kondisi, harga, dan alamat wallet pembeli.",
+    "Item name, condition, price, and the buyer's wallet address."
+  ],
+  "how.2t": ["Penjual kirim link", "Seller shares the link"],
+  "how.2d": [
+    "Catatan dapat nomor ID. Kirim link-nya lewat WhatsApp ke pembeli.",
+    "The record gets an ID number. Send the link to the buyer over WhatsApp."
+  ],
+  "how.3t": ["Pembeli konfirmasi", "Buyer confirms"],
+  "how.3d": [
+    "Sekali ditekan, catatan terkunci selamanya. Selesai.",
+    "One tap and the record is locked forever. Done."
+  ],
+
+  /* --- alert global --- */
+  "alert.noWallet": [
+    "<strong>Instal MetaMask untuk menggunakan aplikasi ini</strong><br>MetaMask adalah dompet digital gratis berbentuk ekstensi browser. Tanpa itu, halaman ini tidak bisa menandatangani catatan atas nama kamu.",
+    "<strong>Install MetaMask to use this app</strong><br>MetaMask is a free digital wallet that lives in your browser. Without it, this page cannot sign a record on your behalf."
+  ],
+  "alert.download": ["Unduh di metamask.io ↗", "Download at metamask.io ↗"],
+  "alert.canStillView": [
+    "Kamu masih bisa <em>melihat</em> catatan yang sudah ada di bagian “Cek catatan” di bawah, tanpa wallet.",
+    "You can still <em>view</em> existing records in the “Check a record” section below, no wallet needed."
+  ],
+  "alert.lib": [
+    "<strong>Gagal memuat komponen aplikasi</strong><br>File pendukung (ethers.js) tidak berhasil diunduh — biasanya karena koneksi internet terputus atau CDN-nya diblokir jaringan kamu. Periksa koneksi, lalu muat ulang halaman ini.",
+    "<strong>Failed to load an app component</strong><br>A supporting file (ethers.js) could not be downloaded — usually a dropped connection or a CDN blocked by your network. Check your connection, then reload this page."
+  ],
+  "alert.reload": ["Muat ulang halaman", "Reload the page"],
+  "btn.switch": ["Pindahkan ke jaringan yang benar", "Switch to the right network"],
+
+  /* --- bagian penjual --- */
+  "tag.seller": ["Untuk penjual", "For sellers"],
+  "create.title": ["Buat catatan serah terima", "Create a handover record"],
+  "create.sub": [
+    "Isi saat barang diserahkan ke pembeli. Setelah tersimpan, isinya <strong>tidak bisa kamu ubah atau hapus</strong> — termasuk oleh kami.",
+    "Fill this in as you hand the item over. Once saved, the contents <strong>cannot be edited or deleted</strong> — not by you, and not by us."
+  ],
+  "f.buyer": ["Alamat wallet pembeli", "Buyer's wallet address"],
+  "f.buyerWhy": [
+    "Cuma alamat inilah yang nanti boleh menekan tombol konfirmasi. Salah alamat, pembeli tidak bisa konfirmasi dan catatan tidak bisa diperbaiki.",
+    "This is the only address allowed to press confirm later. Get it wrong and the buyer cannot confirm — and the record cannot be fixed."
+  ],
+  "f.buyerOk": ["Format alamat sudah benar", "Address format looks right"],
+  "f.buyerHelpQ": ["Bagaimana cara dapat alamat wallet pembeli?", "How do I get the buyer's wallet address?"],
+  "f.buyerHelpA": [
+    "Minta pembeli melakukan ini di HP atau laptopnya:<ol><li>Buka MetaMask.</li><li>Klik nama akun di bagian atas — alamatnya langsung tersalin.</li><li>Paste ke WhatsApp dan kirim ke kamu.</li></ol>Bentuknya panjang dan diawali <span class=\"mono\">0x</span>, misalnya <span class=\"mono\">0x71C7…976F</span>. Aman dibagikan, ini seperti nomor rekening.",
+    "Ask the buyer to do this on their phone or laptop:<ol><li>Open MetaMask.</li><li>Tap the account name at the top — the address is copied instantly.</li><li>Paste it into WhatsApp and send it to you.</li></ol>It is long and starts with <span class=\"mono\">0x</span>, for example <span class=\"mono\">0x71C7…976F</span>. Safe to share — think of it as a bank account number."
+  ],
+  "f.item": ["Nama barang", "Item name"],
+  "f.itemWhy": [
+    "Tulis sejelas mungkin, termasuk varian dan kapasitasnya.",
+    "Be as specific as you can, including the variant and capacity."
+  ],
+  "f.itemPh": ["iPhone 13 128GB warna biru", "iPhone 13 128GB, blue"],
+  "f.max100": ["Maksimal 100 karakter.", "100 characters max."],
+  "f.cond": ["Kondisi barang saat diserahkan", "Condition at the moment of handover"],
+  "f.condWhy": [
+    "Bagian ini yang paling menyelamatkan kamu kalau nanti ada sengketa. Sebutkan lecet, kelengkapan, dan hal yang kurang sekalipun.",
+    "This is the field that saves you in a dispute. Mention scratches, what's included, and anything that is missing."
+  ],
+  "f.condPh": [
+    "Mulus, ada lecet halus di sudut kanan bawah, baterai 89%, fullset dus + charger original",
+    "Excellent, a faint scratch on the bottom-right corner, battery health 89%, original box and charger included"
+  ],
+  "f.max300": ["Maksimal 300 karakter.", "300 characters max."],
+  "f.price": ["Harga kesepakatan", "Agreed price"],
+  "f.priceWhy": [
+    "Tulis apa adanya. Aplikasi ini hanya mencatat, tidak menerima atau menahan uang sama sekali.",
+    "Write it however you like. This app only records it — it never receives or holds any money."
+  ],
+  "f.pricePh": ["Rp 5.500.000", "Rp 5,500,000"],
+  "f.max50": ["Maksimal 50 karakter.", "50 characters max."],
+  "create.costnote": [
+    "Menyimpan ke blockchain butuh biaya jaringan kecil yang dibayar dari saldo BOT kamu, bukan ke kami. MetaMask akan menampilkan jumlahnya dan kamu bisa menolak sebelum apa pun terkirim.",
+    "Writing to the blockchain costs a small network fee paid from your BOT balance, not to us. MetaMask shows you the amount and you can reject it before anything is sent."
+  ],
+  "btn.create": ["Simpan catatan ke blockchain", "Save the record to the blockchain"],
+  "share.title": ["Catatan tersimpan permanen 🎉", "Your record is stored permanently 🎉"],
+  "share.sub": [
+    "Langkah terakhir: kirim link ini ke pembeli supaya dia bisa mengonfirmasi.",
+    "Last step: send this link to the buyer so they can confirm."
+  ],
+  "share.linkLabel": ["Link untuk dibagikan ke pembeli", "Link to share with the buyer"],
+  "btn.copy": ["Salin", "Copy"],
+  "btn.copied": ["Tersalin ✓", "Copied ✓"],
+  "btn.copyManual": ["Salin manual", "Copy manually"],
+  "btn.wa": ["Kirim via WhatsApp", "Send via WhatsApp"],
+  "btn.viewMine": ["Lihat catatannya", "View the record"],
+
+  /* --- bagian pembeli / cek --- */
+  "tag.buyer": ["Untuk pembeli & siapa saja", "For buyers & anyone"],
+  "check.title": ["Cek catatan & konfirmasi", "Check a record & confirm"],
+  "check.sub": [
+    "Masukkan nomor ID yang dikirim penjual. <strong>Tidak perlu wallet</strong> kalau kamu hanya ingin melihat — wallet baru dibutuhkan saat pembeli menekan tombol konfirmasi.",
+    "Enter the ID number the seller sent you. <strong>No wallet needed</strong> just to look — a wallet is only required when the buyer presses confirm."
+  ],
+  "f.id": ["Nomor ID catatan", "Record ID number"],
+  "f.idPh": ["contoh: 1", "example: 1"],
+  "btn.check": ["Cek", "Check"],
+  "f.idHint": ["Nomor urut dari penjual, dimulai dari 1.", "The sequential number from the seller, starting at 1."],
+  "check.empty": [
+    "Belum ada catatan yang ditampilkan.<br>Masukkan nomor ID di atas, atau buka link yang dikirim penjual.",
+    "No record shown yet.<br>Enter an ID number above, or open the link the seller sent you."
+  ],
+
+  /* --- kartu hasil --- */
+  "res.idtag": ["Catatan nomor", "Record number"],
+  "res.cond": ["Kondisi", "Condition"],
+  "res.price": ["Harga", "Price"],
+  "res.seller": ["Penjual", "Seller"],
+  "res.buyer": ["Pembeli", "Buyer"],
+  "res.createdAt": ["Dicatat", "Recorded"],
+  "res.confirmedAt": ["Dikonfirmasi", "Confirmed"],
+  "res.noName": ["(tanpa nama)", "(no name)"],
+  "res.notConfirmed": ["Belum dikonfirmasi", "Not confirmed yet"],
+  "res.roleSeller": ["yang menyerahkan barang", "who handed the item over"],
+  "res.roleBuyer": ["yang berhak konfirmasi", "who is allowed to confirm"],
+  "res.you": ["wallet kamu", "your wallet"],
+
+  /* --- status catatan --- */
+  "st.confirmedAt": ["Diterima pada {time}", "Received on {time}"],
+  "st.confirmedNote": [
+    "Kedua pihak sudah setuju. Bukti ini terkunci permanen dan bisa diperiksa siapa pun tanpa perlu percaya pada kami.",
+    "Both parties have agreed. This proof is locked permanently and anyone can verify it without trusting us."
+  ],
+  "st.pending": ["Menunggu konfirmasi pembeli", "Waiting for the buyer to confirm"],
+  "st.connectFirst": ["Connect wallet untuk mulai", "Connect a wallet to start"],
+  "st.noWalletNote": [
+    "Catatan ini belum dikonfirmasi pembeli. Kalau kamu pembelinya, hubungkan wallet lewat tombol di kanan atas untuk menampilkan tombol konfirmasi.",
+    "This record has not been confirmed by the buyer. If you are the buyer, connect your wallet using the button at the top right to reveal the confirm button."
+  ],
+  "st.iAmBuyer": [
+    "Kamu yang ditunjuk sebagai pembeli. Tombol konfirmasi ada di bawah.",
+    "You are the designated buyer. The confirm button is below."
+  ],
+  "st.iAmSeller": [
+    "Kamu penjualnya. Sekarang menunggu pembeli menekan tombol konfirmasi dari wallet-nya sendiri — kirim ulang link-nya kalau dia belum sempat.",
+    "You are the seller. Now it's up to the buyer to press confirm from their own wallet — resend the link if they haven't got round to it."
+  ],
+  "st.bystander": [
+    "Wallet yang kamu pakai bukan penjual maupun pembeli pada catatan ini, jadi kamu hanya bisa melihat. Hanya pembeli yang ditunjuk yang boleh mengonfirmasi.",
+    "The wallet you're using is neither the seller nor the buyer on this record, so you can only look. Only the designated buyer may confirm."
+  ],
+
+  /* --- zona konfirmasi --- */
+  "cz.head": ["Kamu adalah pembeli pada catatan ini", "You are the buyer on this record"],
+  "cz.sub": [
+    "Pastikan barangnya sudah benar-benar kamu pegang dan isi catatan di atas sudah sesuai. Kalau ada yang tidak cocok, jangan konfirmasi — hubungi penjual dulu.",
+    "Make sure the item is genuinely in your hands and the details above match. If anything is off, do not confirm — talk to the seller first."
+  ],
+  "btn.received": ["Barang sudah saya terima", "I have received the item"],
+  "gate.title": ["⚠️ Sekali dikonfirmasi, tidak bisa dibatalkan", "⚠️ Once confirmed, this cannot be undone"],
+  "gate.list": [
+    "<li>Catatan terkunci selamanya, tidak bisa diedit atau dihapus.</li><li>Hanya bisa dilakukan satu kali.</li><li>Butuh biaya jaringan kecil dari saldo BOT kamu.</li>",
+    "<li>The record is locked forever — no edits, no deletions.</li><li>It can only be done once.</li><li>It costs a small network fee from your BOT balance.</li>"
+  ],
+  "gate.check": [
+    "Saya sudah menerima barangnya dan isi catatan di atas sudah sesuai",
+    "I have received the item and the details above are correct"
+  ],
+  "btn.confirmNow": ["Ya, konfirmasi sekarang", "Yes, confirm now"],
+  "btn.cancel": ["Batal", "Cancel"],
+
+  /* --- faq --- */
+  "faq.title": ["Pertanyaan yang sering ditanyakan", "Frequently asked questions"],
+  "faq.q1": ["Apa itu wallet, dan kenapa saya perlu?", "What is a wallet, and why do I need one?"],
+  "faq.a1": [
+    "Wallet adalah aplikasi kecil yang menyimpan identitas digital kamu — di sini kami pakai <strong>MetaMask</strong>. Fungsinya seperti tanda tangan: dia membuktikan bahwa catatan ini benar dibuat atau disetujui oleh kamu, bukan orang lain yang mengaku-aku. Kami tidak pernah bisa melihat atau menyentuh isi wallet kamu.",
+    "A wallet is a small app that holds your digital identity — here we use <strong>MetaMask</strong>. It works like a signature: it proves this record was really created or approved by you and not by someone impersonating you. We can never see or touch what is inside your wallet."
+  ],
+  "faq.q2": ["Apakah uang pembayaran lewat aplikasi ini?", "Does the payment go through this app?"],
+  "faq.a2": [
+    "<strong>Tidak.</strong> Aplikasi ini murni mencatat kesepakatan. Pembayaran tetap kamu lakukan seperti biasa — transfer, tunai, atau COD. Karena tidak pernah memegang uang, tidak ada dana yang bisa hilang di sini.",
+    "<strong>No.</strong> This app only records the agreement. You still pay the usual way — bank transfer, cash, or on delivery. Because it never holds money, there are no funds here that could be lost."
+  ],
+  "faq.q3": ["Kenapa harus bayar biaya jaringan?", "Why is there a network fee?"],
+  "faq.a3": [
+    "Menulis data ke blockchain dikerjakan oleh ribuan komputer yang saling mengawasi, dan itu perlu biaya kecil. Biaya ini masuk ke jaringan, <strong>bukan ke kami</strong>. Sebagai gantinya, catatan kamu tidak bisa dihapus siapa pun — termasuk oleh pembuat aplikasi ini. Membaca catatan selalu gratis.",
+    "Writing data to a blockchain is done by thousands of computers checking each other, and that costs a little. The fee goes to the network, <strong>not to us</strong>. In return, nobody can delete your record — not even the people who built this app. Reading a record is always free."
+  ],
+  "faq.q4": ["Saya salah isi. Bisa diedit atau dihapus?", "I made a mistake. Can I edit or delete it?"],
+  "faq.a4": [
+    "Tidak bisa, dan itu memang intinya — kalau bisa diedit, buktinya jadi tidak ada gunanya. Kalau ada kesalahan, buat catatan baru yang benar. Catatan lama akan tetap ada tapi tidak pernah dikonfirmasi pembeli, jadi jelas terlihat bahwa itu bukan yang berlaku. Karena itu <strong>periksa alamat wallet pembeli dua kali</strong> sebelum menyimpan.",
+    "No, and that is the whole point — if it could be edited, the proof would be worthless. If something is wrong, create a new, correct record. The old one stays but is never confirmed by the buyer, which makes it obvious it is not the valid one. So <strong>check the buyer's wallet address twice</strong> before saving."
+  ],
+  "faq.q5": ["Kalau pembeli tidak mau konfirmasi?", "What if the buyer never confirms?"],
+  "faq.a5": [
+    "Status catatan akan tetap “menunggu konfirmasi pembeli” selamanya. Itu sendiri sudah jadi informasi: pihak ketiga bisa melihat bahwa penjual mencatat serah terima pada tanggal tertentu dan pembeli belum menyetujuinya.",
+    "The record simply stays “waiting for the buyer to confirm” forever. That in itself is information: a third party can see that the seller recorded a handover on a given date and that the buyer has not agreed to it."
+  ],
+  "faq.q6": ["Bisa dipakai orang lain untuk memverifikasi?", "Can other people use this to verify?"],
+  "faq.a6": [
+    "Bisa, dan tanpa perlu percaya pada kami. Siapa pun cukup membuka link catatan atau memasukkan nomor ID-nya — datanya dibaca langsung dari blockchain, bukan dari server kami. Kalau situs ini hilang besok, catatannya tetap ada.",
+    "Yes, and without trusting us. Anyone can open the record link or type in the ID number — the data is read straight from the blockchain, not from our server. If this site disappeared tomorrow, the record would still be there."
+  ],
+
+  /* --- footer --- */
+  "foot.builtOn": ["Dibangun di <strong>BOT Chain</strong>", "Built on <strong>BOT Chain</strong>"],
+  "foot.navLabel": ["Tautan BOT Chain", "BOT Chain links"],
+  "foot.contractLink": ["Kontrak", "Contract"],
+  "foot.activeNet": ["Jaringan aktif:", "Active network:"],
+  "foot.contract": ["Kontrak:", "Contract:"],
+  "foot.notDeployed": ["belum di-deploy", "not deployed yet"],
+
+  /* --- wallet & jaringan (dinamis) --- */
+  "w.connect": ["Hubungkan Wallet", "Connect Wallet"],
+  "w.connected": ["Terhubung", "Connected"],
+  "w.opening": ["Membuka MetaMask…", "Opening MetaMask…"],
+  "w.openingWallet": ["Membuka wallet…", "Opening wallet…"],
+  "w.noMetamask": ["MetaMask tidak terpasang", "MetaMask not installed"],
+  "w.wrongNet": ["Jaringan salah", "Wrong network"],
+  "w.balanceEmpty": [
+    "Saldo kosong. Kamu butuh sedikit BOT untuk biaya jaringan.",
+    "Empty balance. You need a little BOT for network fees."
+  ],
+  "w.balanceTitle": ["Saldo untuk biaya jaringan", "Balance for network fees"],
+  "net.banner": [
+    "<strong>Kamu sedang di jaringan lain (Chain ID {id})</strong><br>Catatan ini tersimpan di {net}. Klik tombol di bawah untuk pindah — MetaMask akan minta persetujuan kamu dulu.",
+    "<strong>You're on a different network (Chain ID {id})</strong><br>These records live on {net}. Tap the button below to switch — MetaMask will ask for your approval first."
+  ],
+  "net.addFailed": [
+    "Gagal menambahkan {net} ke wallet. Tambahkan manual di MetaMask.",
+    "Could not add {net} to your wallet. Add it manually in MetaMask."
+  ],
+  "net.switchFailed": [
+    "Gagal pindah jaringan. Ganti manual ke {net} di MetaMask.",
+    "Could not switch networks. Change to {net} manually in MetaMask."
+  ],
+  "net.switchFirstCreate": [
+    "Pindah ke {net} dulu sebelum menyimpan catatan.",
+    "Switch to {net} before saving the record."
+  ],
+  "net.switchFirstConfirm": [
+    "Pindah ke {net} dulu sebelum mengonfirmasi.",
+    "Switch to {net} before confirming."
+  ],
+
+  /* --- langkah transaksi --- */
+  "tx.sign": ["Menunggu konfirmasi wallet", "Waiting for wallet confirmation"],
+  "tx.signNote": ["Buka MetaMask dan tekan Confirm", "Open MetaMask and press Confirm"],
+  "tx.mine": ["Memproses transaksi", "Processing the transaction"],
+  "tx.mineNote": [
+    "Sedang ditulis ke blockchain, jangan tutup halaman",
+    "Being written to the blockchain — don't close this page"
+  ],
+  "tx.done": ["Selesai", "Done"],
+  "tx.explorer": ["Lihat buktinya di explorer ↗", "See the proof on the explorer ↗"],
+
+  /* --- pesan error yang sudah diterjemahkan --- */
+  "e.rejected": ["Kamu membatalkan aksi ini", "You cancelled this action"],
+  "e.noFunds": [
+    "Saldo BOT kamu tidak cukup untuk biaya transaksi",
+    "Your BOT balance is not enough to cover the transaction fee"
+  ],
+  "e.notFound": ["Catatan dengan ID ini tidak ditemukan", "No record found with this ID"],
+  "e.network": [
+    "Gagal menghubungi jaringan. Cek koneksi internet kamu, lalu coba lagi",
+    "Could not reach the network. Check your internet connection and try again"
+  ],
+  "e.txFailed": ["Transaksi gagal, coba lagi", "The transaction failed, please try again"],
+  "e.readFailed": [
+    "Gagal membaca data dari jaringan. Cek koneksi internet kamu, lalu coba lagi",
+    "Could not read data from the network. Check your internet connection and try again"
+  ],
+  "e.noContract": [
+    "Alamat kontrak untuk jaringan ini belum diatur",
+    "The contract address for this network has not been set"
+  ],
+  "e.checkNumber": [
+    "Periksa lagi nomornya ke penjual. Nomor ID dimulai dari 1.",
+    "Double-check the number with the seller. ID numbers start at 1."
+  ],
+
+  /* --- revert dari kontrak (teks kontrak berbahasa Indonesia) --- */
+  "rv.badBuyer": ["Alamat pembeli tidak valid", "Invalid buyer address"],
+  "rv.selfBuyer": ["Penjual tidak boleh jadi pembeli", "The seller cannot also be the buyer"],
+  "rv.itemRequired": ["Nama barang wajib diisi", "Item name is required"],
+  "rv.itemLong": ["Nama barang terlalu panjang", "Item name is too long"],
+  "rv.condLong": ["Kondisi terlalu panjang", "Condition text is too long"],
+  "rv.priceLong": ["Harga terlalu panjang", "Price text is too long"],
+  "rv.onlyBuyer": ["Hanya pembeli yang bisa konfirmasi", "Only the buyer can confirm"],
+  "rv.already": ["Sudah dikonfirmasi sebelumnya", "Already confirmed earlier"],
+
+  /* --- validasi form --- */
+  "v.buyerRequired": ["Alamat wallet pembeli wajib diisi", "The buyer's wallet address is required"],
+  "v.buyerFormat": [
+    "Format alamat wallet tidak valid. Pastikan disalin utuh, diawali 0x.",
+    "That wallet address is not valid. Make sure it was copied in full, starting with 0x."
+  ],
+  "v.buyerSelf": [
+    "Penjual tidak boleh jadi pembeli — pakai alamat wallet pembeli",
+    "The seller cannot be the buyer — use the buyer's wallet address"
+  ],
+  "v.buyerIsYou": [
+    "Ini alamat kamu sendiri. Masukkan alamat wallet pembeli.",
+    "That's your own address. Enter the buyer's wallet address."
+  ],
+  "v.itemRequired": ["Nama barang wajib diisi", "Item name is required"],
+  "v.itemLong": ["Nama barang terlalu panjang (maks 100)", "Item name is too long (100 max)"],
+  "v.condLong": ["Kondisi terlalu panjang (maks 300)", "Condition text is too long (300 max)"],
+  "v.priceLong": ["Harga terlalu panjang (maks 50)", "Price text is too long (50 max)"],
+  "v.idRequired": ["Masukkan dulu nomor ID catatannya", "Enter the record ID number first"],
+  "v.idFormat": [
+    "Nomor ID harus angka bulat mulai dari 1",
+    "The ID must be a whole number starting from 1"
+  ],
+
+  /* --- status & hasil --- */
+  "s.connectFirst": [
+    "Hubungkan wallet kamu dulu — MetaMask akan terbuka sebentar.",
+    "Connect your wallet first — MetaMask will open for a moment."
+  ],
+  "s.reading": ["Membaca data dari blockchain…", "Reading data from the blockchain…"],
+  "s.createdNoId": [
+    "<strong>Transaksi berhasil</strong>, tetapi nomor ID tidak terbaca dari event. Cek di explorer untuk melihat nomornya.",
+    "<strong>The transaction succeeded</strong>, but the ID could not be read from the event. Check the explorer to find the number."
+  ],
+  "s.createdOk": ["<strong>Berhasil, ID kamu: #{id}</strong>", "<strong>Success — your ID is #{id}</strong>"],
+  "s.confirmedOk": [
+    "<strong>Konfirmasi berhasil 🎉</strong><br>Catatan ini sekarang terkunci selamanya. ",
+    "<strong>Confirmed 🎉</strong><br>This record is now locked forever. "
+  ],
+  "s.total": ["{n} catatan sudah tersimpan permanen", "{n} records stored permanently"],
+  "s.totalZero": [
+    "Belum ada catatan di sini — kamu bisa jadi yang pertama",
+    "No records here yet — you could be the first"
+  ],
+  "s.totalFailed": [
+    "Gagal membaca jumlah catatan dari jaringan",
+    "Could not read the number of records from the network"
+  ],
+  "s.notReady": [
+    "Aplikasi belum siap — komponen gagal dimuat",
+    "The app isn't ready — a component failed to load"
+  ],
+
+  /* --- pesan share ke WhatsApp --- */
+  "share.waMsg": [
+    "Halo, ini bukti serah terima barang kita. Tolong buka link-nya dan tekan tombol konfirmasi kalau barangnya sudah kamu terima:\n{url}",
+    "Hi, here's the handover record for our deal. Please open the link and press confirm once you've received the item:\n{url}"
+  ],
+  "share.waMsgNoUrl": [
+    "Halo, ini bukti serah terima barang kita. Nomor ID catatannya: #{id}",
+    "Hi, here's the handover record for our deal. The record ID is #{id}"
+  ],
+  "share.idOnly": ["Nomor ID: #{id}", "Record ID: #{id}"]
+};
+
+/** Ambil string sesuai bahasa aktif; {placeholder} diganti dari `vars`. */
+function t(key, vars) {
+  const row = STR[key];
+  let s = row ? (LANG === "en" ? (row[1] ?? row[0]) : row[0]) : key;
+  if (vars) {
+    for (const k in vars) s = s.split("{" + k + "}").join(String(vars[k]));
+  }
+  return s;
+}
+
+/** Pesan revert dari kontrak berbahasa Indonesia -> ikut bahasa aktif. */
+const REVERT_MAP = {
+  "alamat pembeli tidak valid": "rv.badBuyer",
+  "penjual tidak boleh jadi pembeli": "rv.selfBuyer",
+  "nama barang wajib diisi": "rv.itemRequired",
+  "nama barang terlalu panjang": "rv.itemLong",
+  "kondisi terlalu panjang": "rv.condLong",
+  "harga terlalu panjang": "rv.priceLong",
+  "catatan tidak ditemukan": "e.notFound",
+  "hanya pembeli yang bisa konfirmasi": "rv.onlyBuyer",
+  "sudah dikonfirmasi sebelumnya": "rv.already"
+};
+function translateRevert(reason) {
+  const key = REVERT_MAP[String(reason).trim().toLowerCase()];
+  return key ? t(key) : reason;
+}
+
+/** Terapkan seluruh teks statis yang diberi atribut data-i18n*. */
+function applyI18n() {
+  document.documentElement.setAttribute("lang", LANG);
+  document.title = t("meta.title");
+  const desc = document.querySelector('meta[name="description"]');
+  if (desc) desc.setAttribute("content", t("meta.desc"));
+
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    el.textContent = t(el.getAttribute("data-i18n"));
+  });
+  document.querySelectorAll("[data-i18n-html]").forEach((el) => {
+    el.innerHTML = t(el.getAttribute("data-i18n-html"));
+  });
+  document.querySelectorAll("[data-i18n-ph]").forEach((el) => {
+    el.setAttribute("placeholder", t(el.getAttribute("data-i18n-ph")));
+  });
+  document.querySelectorAll("[data-i18n-aria]").forEach((el) => {
+    el.setAttribute("aria-label", t(el.getAttribute("data-i18n-aria")));
+  });
+
+  const idBtn = document.getElementById("btnLangId");
+  const enBtn = document.getElementById("btnLangEn");
+  if (idBtn) idBtn.setAttribute("aria-pressed", String(LANG === "id"));
+  if (enBtn) enBtn.setAttribute("aria-pressed", String(LANG === "en"));
+  syncThemeButton();
+}
+
+/** Ganti bahasa, simpan pilihan, lalu render ulang bagian yang dinamis. */
+function setLang(lang, remember) {
+  LANG = lang === "en" ? "en" : "id";
+  if (remember) store.set(LANG_KEY, LANG);
+  applyI18n();
+  // Bagian yang teksnya dibuat JS tidak punya atribut data-i18n -> render ulang.
+  if (typeof renderWallet === "function") renderWallet();
+  if (typeof renderFooter === "function") renderFooter();
+  if (typeof refreshTotal === "function" && ETHERS_OK) refreshTotal();
+}
+
+/* Tampilkan elemen .reveal saat masuk viewport. Tanpa IntersectionObserver
+   (atau bila pengguna minta sedikit gerak) semuanya langsung ditampilkan. */
+function initReveal() {
+  const els = Array.from(document.querySelectorAll(".reveal"));
+  const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (still || !("IntersectionObserver" in window)) {
+    els.forEach((el) => el.classList.add("in"));
+    return;
+  }
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((en) => {
+      if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); }
+    });
+  }, { rootMargin: "0px 0px -6% 0px", threshold: 0.06 });
+  els.forEach((el) => io.observe(el));
+}
+
+
+/* ============================================================
    STATE & HELPER DOM
    ============================================================ */
 
@@ -882,14 +1655,15 @@ const scrollToEl = (el) => { try { el?.scrollIntoView?.({ behavior: "smooth", bl
 function fmtTime(unixSeconds) {
   const n = Number(unixSeconds);
   if (!n) return null;
-  // Timestamp dari blok berformat Unix (detik) -> waktu lokal perangkat.
-  return new Date(n * 1000).toLocaleString("id-ID", {
+  // Timestamp dari blok berformat Unix (detik) -> waktu lokal perangkat,
+  // dengan format tanggal mengikuti bahasa yang dipilih.
+  return new Date(n * 1000).toLocaleString(LANG === "en" ? "en-GB" : "id-ID", {
     day: "2-digit", month: "long", year: "numeric",
     hour: "2-digit", minute: "2-digit"
   });
 }
 const txLink = (hash) =>
-  `<a href="${TARGET.explorer}/tx/${hash}" target="_blank" rel="noopener noreferrer">Lihat buktinya di explorer ↗</a>`;
+  `<a href="${TARGET.explorer}/tx/${hash}" target="_blank" rel="noopener noreferrer">${t("tx.explorer")}</a>`;
 
 /**
  * Stepper transaksi. Label sengaja mengikuti urutan status yang diminta PRD FE4:
@@ -897,9 +1671,9 @@ const txLink = (hash) =>
  */
 function setSteps(el, stage) {
   const steps = [
-    ["sign", "Menunggu konfirmasi wallet", "Buka MetaMask dan tekan Confirm"],
-    ["mine", "Memproses transaksi", "Sedang ditulis ke blockchain, jangan tutup halaman"],
-    ["done", "Selesai", ""]
+    ["sign", t("tx.sign"), t("tx.signNote")],
+    ["mine", t("tx.mine"), t("tx.mineNote")],
+    ["done", t("tx.done"), ""]
   ];
   const order = ["sign", "mine", "done"];
   const at = order.indexOf(stage);
@@ -946,33 +1720,33 @@ function isInsufficientFunds(err) {
 
 /** Error untuk transaksi tulis (create / confirm). */
 function humanTxError(err) {
-  if (isUserRejection(err)) return "Kamu membatalkan aksi ini";
-  if (isInsufficientFunds(err)) return "Saldo BOT kamu tidak cukup untuk biaya transaksi";
+  if (isUserRejection(err)) return t("e.rejected");
+  if (isInsufficientFunds(err)) return t("e.noFunds");
 
   const reason = revertReason(err);
   if (reason) {
-    // Pesan revert dari kontrak sudah berbahasa Indonesia dan jelas -> tampilkan langsung.
-    if (/catatan tidak ditemukan/i.test(reason)) return "Catatan dengan ID ini tidak ditemukan";
-    return reason;
+    // Pesan revert dari kontrak sudah jelas -> tampilkan, diterjemahkan bila dikenali.
+    if (/catatan tidak ditemukan/i.test(reason)) return t("e.notFound");
+    return translateRevert(reason);
   }
   if (err?.code === "NETWORK_ERROR" || /failed to fetch|network error|timeout/i.test(rawMessage(err))) {
-    return "Gagal menghubungi jaringan. Cek koneksi internet kamu, lalu coba lagi";
+    return t("e.network");
   }
   // Sisanya (kode angka / JSON panjang dari ethers) tidak pernah ditampilkan mentah.
-  return "Transaksi gagal, coba lagi";
+  return t("e.txFailed");
 }
 
 /** Error untuk pemanggilan baca (getHandover / totalHandovers). */
 function humanReadError(err) {
   const reason = revertReason(err);
   if (reason && /catatan tidak ditemukan/i.test(reason)) {
-    return "Catatan dengan ID ini tidak ditemukan";
+    return t("e.notFound");
   }
   if (err?.code === "CALL_EXCEPTION" || err?.code === "BAD_DATA") {
-    return "Catatan dengan ID ini tidak ditemukan";
+    return t("e.notFound");
   }
-  if (reason) return reason;
-  return "Gagal membaca data dari jaringan. Cek koneksi internet kamu, lalu coba lagi";
+  if (reason) return translateRevert(reason);
+  return t("e.readFailed");
 }
 
 /* ============================================================
@@ -1010,7 +1784,7 @@ async function connectWallet() {
   }
   const btn = $("btnConnect");
   btn.disabled = true;
-  btn.textContent = "Membuka MetaMask…";
+  btn.textContent = t("w.opening");
   try {
     const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
     state.account = accounts[0];
@@ -1033,11 +1807,9 @@ async function refreshBalance() {
     const wei = await readProvider.getBalance(state.account);
     const bot = Number(ethers.formatEther(wei));
     chip.hidden = false;
-    chip.textContent = bot.toLocaleString("id-ID", { maximumFractionDigits: 4 }) + " BOT";
+    chip.textContent = bot.toLocaleString(LANG === "en" ? "en-GB" : "id-ID", { maximumFractionDigits: 4 }) + " BOT";
     chip.className = "chip" + (bot === 0 ? " chip-warn" : "");
-    chip.title = bot === 0
-      ? "Saldo kosong. Kamu butuh sedikit BOT untuk biaya jaringan."
-      : "Saldo untuk biaya jaringan";
+    chip.title = bot === 0 ? t("w.balanceEmpty") : t("w.balanceTitle");
   } catch {
     chip.hidden = true;
   }
@@ -1053,7 +1825,7 @@ async function switchNetwork() {
   if (!hasWallet()) return;
   const btn = $("btnSwitch");
   btn.disabled = true;
-  btn.textContent = "Membuka wallet…";
+  btn.textContent = t("w.openingWallet");
   try {
     await window.ethereum.request({
       method: "wallet_switchEthereumChain",
@@ -1076,18 +1848,17 @@ async function switchNetwork() {
         });
       } catch (addErr) {
         $("alertNetworkText").textContent = isUserRejection(addErr)
-          ? "Kamu membatalkan aksi ini"
-          : "Gagal menambahkan " + TARGET.name + " ke wallet. Tambahkan manual di MetaMask.";
+          ? t("e.rejected")
+          : t("net.addFailed", { net: TARGET.name });
       }
     } else if (isUserRejection(err)) {
-      $("alertNetworkText").textContent = "Kamu membatalkan aksi ini";
+      $("alertNetworkText").textContent = t("e.rejected");
     } else {
-      $("alertNetworkText").textContent =
-        "Gagal pindah jaringan. Ganti manual ke " + TARGET.name + " di MetaMask.";
+      $("alertNetworkText").textContent = t("net.switchFailed", { net: TARGET.name });
     }
   } finally {
     btn.disabled = false;
-    btn.textContent = "Pindahkan ke jaringan yang benar";
+    btn.textContent = t("btn.switch");
     await refreshWalletState();
   }
 }
@@ -1111,25 +1882,25 @@ function renderWallet() {
     accEl.hidden = false;
     accEl.textContent = short(state.account);
     accEl.title = state.account;
-    btn.textContent = "Terhubung";
+    btn.textContent = t("w.connected");
     btn.disabled = true;
     btn.classList.replace("btn-primary", "btn-ghost");
   } else {
     accEl.hidden = true;
-    btn.textContent = "Hubungkan Wallet";
+    btn.textContent = t("w.connect");
     btn.disabled = false;
     btn.classList.replace("btn-ghost", "btn-primary");
   }
 
   // pill jaringan
   if (!hasWallet()) {
-    setPill($("netPill"), $("netLabel"), "pill-grey", "MetaMask tidak terpasang");
+    setPill($("netPill"), $("netLabel"), "pill-grey", t("w.noMetamask"));
   } else if (!state.account) {
-    setPill($("netPill"), $("netLabel"), "pill-grey", "Connect wallet untuk mulai");
+    setPill($("netPill"), $("netLabel"), "pill-grey", t("st.connectFirst"));
   } else if (onTargetNetwork()) {
     setPill($("netPill"), $("netLabel"), "pill-ok", TARGET.name);
   } else {
-    setPill($("netPill"), $("netLabel"), "pill-warn", "Jaringan salah");
+    setPill($("netPill"), $("netLabel"), "pill-warn", t("w.wrongNet"));
   }
 
   // FE2 banner
@@ -1137,9 +1908,7 @@ function renderWallet() {
   $("alertNetwork").classList.toggle("show", !!wrongNetwork);
   if (wrongNetwork) {
     $("alertNetworkText").innerHTML =
-      "<strong>Kamu sedang di jaringan lain (Chain ID " + state.walletChainId + ")</strong><br>" +
-      "Catatan ini tersimpan di " + esc(TARGET.name) + ". Klik tombol di bawah untuk pindah — " +
-      "MetaMask akan minta persetujuan kamu dulu.";
+      t("net.banner", { id: state.walletChainId, net: esc(TARGET.name) });
   }
 
   // Tampilan kartu bergantung pada wallet aktif (status, tanda "wallet kamu",
@@ -1180,7 +1949,7 @@ function liveCheckBuyer() {
     el.removeAttribute("aria-invalid");
     $("errBuyer").classList.remove("show");
     if (state.account && v.toLowerCase() === state.account.toLowerCase()) {
-      fieldError("inBuyer", "errBuyer", "Ini alamat kamu sendiri. Masukkan alamat wallet pembeli.");
+      fieldError("inBuyer", "errBuyer", t("v.buyerIsYou"));
       el.classList.remove("valid");
       return;
     }
@@ -1201,18 +1970,18 @@ function validateCreate() {
   let firstBad = null;
   const bad = (i, e, m) => { fieldError(i, e, m); if (!firstBad) firstBad = i; };
 
-  if (!buyer) bad("inBuyer", "errBuyer", "Alamat wallet pembeli wajib diisi");
+  if (!buyer) bad("inBuyer", "errBuyer", t("v.buyerRequired"));
   else if (!ethers.isAddress(buyer))
-    bad("inBuyer", "errBuyer", "Format alamat wallet tidak valid. Pastikan disalin utuh, diawali 0x.");
-  else if (buyer === ethers.ZeroAddress) bad("inBuyer", "errBuyer", "Alamat pembeli tidak valid");
+    bad("inBuyer", "errBuyer", t("v.buyerFormat"));
+  else if (buyer === ethers.ZeroAddress) bad("inBuyer", "errBuyer", t("rv.badBuyer"));
   else if (state.account && buyer.toLowerCase() === state.account.toLowerCase())
-    bad("inBuyer", "errBuyer", "Penjual tidak boleh jadi pembeli — pakai alamat wallet pembeli");
+    bad("inBuyer", "errBuyer", t("v.buyerSelf"));
 
-  if (!itemName) bad("inItem", "errItem", "Nama barang wajib diisi");
-  else if (byteLen(itemName) > MAX_ITEM_NAME) bad("inItem", "errItem", "Nama barang terlalu panjang (maks 100)");
+  if (!itemName) bad("inItem", "errItem", t("v.itemRequired"));
+  else if (byteLen(itemName) > MAX_ITEM_NAME) bad("inItem", "errItem", t("v.itemLong"));
 
-  if (byteLen(condition) > MAX_CONDITION) bad("inCondition", "errCond", "Kondisi terlalu panjang (maks 300)");
-  if (byteLen(price) > MAX_PRICE) bad("inPrice", "errPrice", "Harga terlalu panjang (maks 50)");
+  if (byteLen(condition) > MAX_CONDITION) bad("inCondition", "errCond", t("v.condLong"));
+  if (byteLen(price) > MAX_PRICE) bad("inPrice", "errPrice", t("v.priceLong"));
 
   if (firstBad) { $(firstBad).focus(); scrollToEl($(firstBad)); return null; }
   return { buyer, itemName, condition, price };
@@ -1226,12 +1995,13 @@ async function submitCreate(ev) {
 
   if (!hasWallet()) {
     setAlert(box, "err",
-      '<strong>Instal MetaMask untuk menggunakan aplikasi ini</strong><br>' +
-      '<a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer">Unduh di metamask.io ↗</a>');
+      t("alert.noWallet") +
+      '<div class="act"><a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer">' +
+      t("alert.download") + "</a></div>");
     return;
   }
   if (!state.account) {
-    setAlert(box, "warn", "Hubungkan wallet kamu dulu — MetaMask akan terbuka sebentar.");
+    setAlert(box, "warn", t("s.connectFirst"));
     await connectWallet();
     if (!state.account) return;
   }
@@ -1240,7 +2010,7 @@ async function submitCreate(ev) {
   if (!input) return;
 
   if (!(await ensureNetwork())) {
-    setAlert(box, "warn", "Pindah ke " + esc(TARGET.name) + " dulu sebelum menyimpan catatan.");
+    setAlert(box, "warn", t("net.switchFirstCreate", { net: esc(TARGET.name) }));
     return;
   }
 
@@ -1271,12 +2041,9 @@ async function submitCreate(ev) {
     }
 
     if (newId === null) {
-      setAlert(box, "ok",
-        "<strong>Transaksi berhasil</strong>, tetapi nomor ID tidak terbaca dari event. " +
-        "Cek di explorer untuk melihat nomornya. " + txLink(tx.hash));
+      setAlert(box, "ok", t("s.createdNoId") + " " + txLink(tx.hash));
     } else {
-      setAlert(box, "ok",
-        "<strong>Berhasil, ID kamu: #" + newId.toString() + "</strong><br>" + txLink(tx.hash));
+      setAlert(box, "ok", t("s.createdOk", { id: newId.toString() }) + "<br>" + txLink(tx.hash));
       $("formCreate").reset();
       clearFieldErrors();
       $("inBuyer").classList.remove("valid");
@@ -1309,12 +2076,12 @@ function showShareBox(id) {
   $("btnViewMine").dataset.id = id;
 
   const msg = url
-    ? "Halo, ini bukti serah terima barang kita. Tolong buka link-nya dan tekan tombol konfirmasi kalau barangnya sudah kamu terima:\n" + url
-    : "Halo, ini bukti serah terima barang kita. Nomor ID catatannya: #" + id;
+    ? t("share.waMsg", { url })
+    : t("share.waMsgNoUrl", { id });
 
-  $("shareLink").value = url || ("Nomor ID: #" + id);
+  $("shareLink").value = url || t("share.idOnly", { id });
   $("btnWa").href = "https://wa.me/?text=" + encodeURIComponent(msg);
-  $("btnCopyLink").textContent = "Salin";
+  $("btnCopyLink").textContent = t("btn.copy");
 }
 
 async function copyShareLink() {
@@ -1328,8 +2095,8 @@ async function copyShareLink() {
   if (!done) {
     try { input.select?.(); done = document.execCommand?.("copy") || false; } catch {}
   }
-  btn.textContent = done ? "Tersalin ✓" : "Salin manual";
-  setTimeout(() => { btn.textContent = "Salin"; }, 2200);
+  btn.textContent = done ? t("btn.copied") : t("btn.copyManual");
+  setTimeout(() => { btn.textContent = t("btn.copy"); }, 2200);
 }
 
 /* ============================================================
@@ -1343,12 +2110,12 @@ async function submitCheck(ev) {
   $("inId").removeAttribute("aria-invalid");
 
   if (!raw) {
-    fieldError("inId", "errId", "Masukkan dulu nomor ID catatannya");
+    fieldError("inId", "errId", t("v.idRequired"));
     return;
   }
   if (!/^\d+$/.test(raw) || BigInt(raw) < 1n) {
     // ID mulai dari 1; getHandover(0) selalu revert, jadi dicegah di sini.
-    fieldError("inId", "errId", "Nomor ID harus angka bulat mulai dari 1");
+    fieldError("inId", "errId", t("v.idFormat"));
     return;
   }
   await loadHandover(raw);
@@ -1358,10 +2125,10 @@ async function loadHandover(idStr) {
   const box = $("checkStatus");
   const btn = $("btnCheck");
   btn.disabled = true;
-  setAlert(box, "info", '<span class="spin"></span> Membaca data dari blockchain…');
+  setAlert(box, "info", '<span class="spin"></span> ' + t("s.reading"));
 
   try {
-    if (!readContract) throw new Error("Alamat kontrak untuk jaringan ini belum diatur");
+    if (!readContract) throw new Error(t("e.noContract"));
     const h = await readContract.getHandover(BigInt(idStr));
     state.current = {
       id: idStr,
@@ -1385,9 +2152,7 @@ async function loadHandover(idStr) {
     const msg = humanReadError(err);
     setAlert(box, "err",
       "<strong>" + esc(msg) + "</strong>" +
-      (/tidak ditemukan/.test(msg)
-        ? "<br>Periksa lagi nomornya ke penjual. Nomor ID dimulai dari 1."
-        : ""));
+      (msg === t("e.notFound") ? "<br>" + t("e.checkNumber") : ""));
   } finally {
     btn.disabled = false;
   }
@@ -1399,7 +2164,7 @@ function renderResult() {
 
   $("emptyState").style.display = "none";
   $("resultCard").style.display = "block";
-  $("rItem").textContent = data.itemName || "(tanpa nama)";
+  $("rItem").textContent = data.itemName || t("res.noName");
   $("rId").textContent = "#" + id;
   $("rCondition").textContent = data.condition || "—";
   $("rPrice").textContent = data.price || "—";
@@ -1412,16 +2177,16 @@ function renderResult() {
     return `<span class="addr-line" data-full="${esc(addr)}">` +
       `<a class="mono" href="${TARGET.explorer}/address/${addr}" target="_blank" ` +
       `rel="noopener noreferrer" title="${esc(addr)}">${esc(short(addr))}</a>` +
-      (isMe ? '<span class="you">wallet kamu</span>' : "") +
+      (isMe ? '<span class="you">' + t("res.you") + "</span>" : "") +
       `<span class="role-note">${roleLabel}</span></span>`;
   };
-  $("rSeller").innerHTML = addrCell(data.seller, "yang menyerahkan barang");
-  $("rBuyer").innerHTML = addrCell(data.buyer, "yang berhak konfirmasi");
+  $("rSeller").innerHTML = addrCell(data.seller, t("res.roleSeller"));
+  $("rBuyer").innerHTML = addrCell(data.buyer, t("res.roleBuyer"));
 
   $("rCreatedAt").textContent = fmtTime(data.createdAt) || "—";
   $("rConfirmedAt").textContent = data.isConfirmed
     ? (fmtTime(data.confirmedAt) || "—")
-    : "Belum dikonfirmasi";
+    : t("res.notConfirmed");
 
   renderStatusPill();
   renderConfirmZone();
@@ -1436,28 +2201,24 @@ function renderStatusPill() {
   const iAmSeller = me && d.seller.toLowerCase() === me;
 
   if (d.isConfirmed) {
-    setPill(pill, txt, "pill-ok", "Diterima pada " + (fmtTime(d.confirmedAt) || "—"));
-    note.textContent = "Kedua pihak sudah setuju. Bukti ini terkunci permanen dan bisa "
-      + "diperiksa siapa pun tanpa perlu percaya pada kami.";
+    setPill(pill, txt, "pill-ok", t("st.confirmedAt", { time: fmtTime(d.confirmedAt) || "—" }));
+    note.textContent = t("st.confirmedNote");
     return;
   }
 
   if (!state.account) {
-    setPill(pill, txt, "pill-grey", "Connect wallet untuk mulai");
-    note.textContent = "Catatan ini belum dikonfirmasi pembeli. Kalau kamu pembelinya, "
-      + "hubungkan wallet lewat tombol di kanan atas untuk menampilkan tombol konfirmasi.";
+    setPill(pill, txt, "pill-grey", t("st.connectFirst"));
+    note.textContent = t("st.noWalletNote");
     return;
   }
 
-  setPill(pill, txt, "pill-warn", "Menunggu konfirmasi pembeli");
+  setPill(pill, txt, "pill-warn", t("st.pending"));
   if (iAmBuyer) {
-    note.textContent = "Kamu yang ditunjuk sebagai pembeli. Tombol konfirmasi ada di bawah.";
+    note.textContent = t("st.iAmBuyer");
   } else if (iAmSeller) {
-    note.textContent = "Kamu penjualnya. Sekarang menunggu pembeli menekan tombol konfirmasi "
-      + "dari wallet-nya sendiri — kirim ulang link-nya kalau dia belum sempat.";
+    note.textContent = t("st.iAmSeller");
   } else {
-    note.textContent = "Wallet yang kamu pakai bukan penjual maupun pembeli pada catatan ini, "
-      + "jadi kamu hanya bisa melihat. Hanya pembeli yang ditunjuk yang boleh mengonfirmasi.";
+    note.textContent = t("st.bystander");
   }
 }
 
@@ -1518,7 +2279,7 @@ async function confirmHandover() {
   }
 
   if (!(await ensureNetwork())) {
-    setAlert(box, "warn", "Pindah ke " + esc(TARGET.name) + " dulu sebelum mengonfirmasi.");
+    setAlert(box, "warn", t("net.switchFirstConfirm", { net: esc(TARGET.name) }));
     return;
   }
 
@@ -1536,9 +2297,7 @@ async function confirmHandover() {
     // Baca ulang dari chain supaya status & timestamp benar tanpa reload halaman.
     await loadHandover(state.current.id);
     resetConfirmGate();
-    setAlert($("confirmStatus"), "ok",
-      "<strong>Konfirmasi berhasil 🎉</strong><br>Catatan ini sekarang terkunci selamanya. " +
-      txLink(txHash));
+    setAlert($("confirmStatus"), "ok", t("s.confirmedOk") + txLink(txHash));
     refreshBalance();
   } catch (err) {
     setAlert(box, isUserRejection(err) ? "warn" : "err",
@@ -1552,14 +2311,14 @@ async function confirmHandover() {
    ============================================================ */
 async function refreshTotal() {
   const el = $("statTotal");
-  if (!readContract) { el.textContent = "Alamat kontrak untuk jaringan ini belum diatur."; return; }
+  if (!readContract) { el.textContent = t("e.noContract"); return; }
   try {
     const total = await readContract.totalHandovers();
     el.textContent = total.toString() === "0"
-      ? "Belum ada catatan di sini — kamu bisa jadi yang pertama"
-      : total.toString() + " catatan sudah tersimpan permanen";
+      ? t("s.totalZero")
+      : t("s.total", { n: total.toString() });
   } catch {
-    el.textContent = "Gagal membaca jumlah catatan dari jaringan";
+    el.textContent = t("s.totalFailed");
   }
 }
 
@@ -1569,7 +2328,7 @@ function renderFooter() {
     $("footContract").textContent = TARGET.contract;
     $("linkContract").href = TARGET.explorer + "/address/" + TARGET.contract;
   } else {
-    $("footContract").textContent = "belum di-deploy";
+    $("footContract").textContent = t("foot.notDeployed");
     $("linkContract").href = TARGET.explorer;
   }
 }
@@ -1578,6 +2337,23 @@ function renderFooter() {
    INIT
    ============================================================ */
 function init() {
+  /* --- tampilan dulu: tema, bahasa, animasi. Harus jalan lebih awal
+         supaya halaman tetap benar bahkan kalau ethers.js gagal dimuat. --- */
+  applyI18n();
+  setTheme(currentTheme(), false);   // sinkronkan meta theme-color & label tombol
+  initReveal();
+
+  $("btnTheme").addEventListener("click", () => {
+    setTheme(currentTheme() === "dark" ? "light" : "dark", true);
+  });
+  $("btnLangId").addEventListener("click", () => setLang("id", true));
+  $("btnLangEn").addEventListener("click", () => setLang("en", true));
+
+  // Ikuti tema sistem selama pengguna belum pernah memilih sendiri.
+  window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", (e) => {
+    if (!store.get(THEME_KEY)) setTheme(e.matches ? "dark" : "light", false);
+  });
+
   renderFooter();
   $("btnReload").addEventListener("click", () => location.reload());
 
@@ -1585,7 +2361,7 @@ function init() {
   // pengguna menekan tombol yang pasti tidak merespons.
   if (!ETHERS_OK) {
     $("alertLib").classList.add("show");
-    $("statTotal").textContent = "Aplikasi belum siap — komponen gagal dimuat";
+    $("statTotal").textContent = t("s.notReady");
     ["btnConnect", "btnCreate", "btnCheck", "btnConfirm", "btnConfirmFinal"]
       .forEach((id) => { const b = $(id); if (b) b.disabled = true; });
     return;
